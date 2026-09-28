@@ -16,6 +16,8 @@ agent가 필요한 것만 읽도록 돕는다. 모든 출력은 한글이다.
   lab.py history <ID>                  세션 로그에서 그 항목이 바뀐 이력
   lab.py verify <EXP-id>               실험 감사: 사전 등록 + results.json이 실행 기록과 일치하는지
   lab.py digest                        kb/digest.md 다시 만들기 (연구실이 아는 것 1쪽)
+  lab.py pack-md <경로들> --out 묶음.md  코드 파일들을 복원 가능한 md 하나로 묶기 (회사로는 md만 가져갈 수 있다)
+  lab.py unpack-md 묶음.md --out 폴더    md 묶음에서 원래 파일 복원
 
 연구실 루트 = 현재 폴더에서 위로 올라가며 lab.config.json이 있는 첫 폴더
 (--lab 경로 또는 환경 변수 AI_LAB_DIR로 지정 가능).
@@ -670,6 +672,103 @@ def cmd_history(args) -> None:
         print("(기록된 변화 없음)")
 
 
+# ---------------------------------------------------------------- md 묶음 (회사로는 md 파일만 가져갈 수 있다)
+
+LANG_BY_SUFFIX = {".py": "python", ".toml": "toml", ".json": "json", ".yaml": "yaml", ".yml": "yaml",
+                  ".md": "markdown", ".txt": "text", ".sh": "bash", ".ps1": "powershell", ".cfg": "ini", ".ini": "ini"}
+PACK_SKIP_DIRS = {"runs", "__pycache__", ".venv", ".rel-venv", ".git", "data", "figures", "wandb"}
+PACK_MAX_BYTES = 200_000
+FILE_HEADING = "### 파일: "
+# 회사 PC에서 이 스크립트를 restore.py로 저장하고 `python restore.py 묶음.md [출력폴더]`로 실행하면 파일이 복원된다.
+# lab.py unpack-md도 똑같은 규칙을 쓴다 (둘을 함께 고칠 것).
+RESTORE_SNIPPET = r'''import pathlib, re, sys
+text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
+out_dir = pathlib.Path(sys.argv[2] if len(sys.argv) > 2 else ".")
+pattern = re.compile(r"^### 파일: (.+?)\n(`{3,})[^\n]*\n(.*?)\n\2$", re.S | re.M)
+for rel_path, fence, body in pattern.findall(text):
+    target = out_dir / rel_path.strip()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(body + "\n", encoding="utf-8")
+    try:
+        print("복원:", target)
+    except UnicodeEncodeError:
+        print("restored:", ascii(str(target)))'''
+RESTORE_RE = re.compile(r"^### 파일: (.+?)\n(`{3,})[^\n]*\n(.*?)\n\2$", re.S | re.M)
+
+
+def _pack_files(root: Path, targets: list[str]) -> tuple[list[tuple[str, str]], list[str]]:
+    """묶을 텍스트 파일 (상대 경로, 내용)과 건너뛴 항목 목록을 돌려준다."""
+    files: list[tuple[str, str]] = []
+    skipped: list[str] = []
+    for t in targets:
+        p = (root / t).resolve()
+        cands = [p] if p.is_file() else sorted(x for x in p.rglob("*") if x.is_file()) if p.is_dir() else []
+        if not cands:
+            skipped.append(f"{t} (없음)")
+        for f in cands:
+            rp = f.relative_to(root).as_posix() if f.is_relative_to(root) else f.name
+            if any(part in PACK_SKIP_DIRS for part in Path(rp).parts):
+                continue
+            if f.stat().st_size > PACK_MAX_BYTES:
+                skipped.append(f"{rp} (너무 큼)")
+                continue
+            try:
+                text = f.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, OSError):
+                skipped.append(f"{rp} (텍스트 파일 아님)")
+                continue
+            files.append((rp, text))
+    return files, skipped
+
+
+def cmd_pack_md(args) -> None:
+    """여러 텍스트 파일을 복원 가능한 md 파일 하나로 묶는다."""
+    import hashlib
+    root = Path(args.root).resolve() if args.root else Path.cwd()
+    files, skipped = _pack_files(root, args.paths)
+    if not files:
+        sys.exit("오류: 묶을 텍스트 파일이 없습니다")
+    lines = [f"# {args.title or '코드 묶음'}", "",
+             "> 이 문서는 코드 파일들을 md 하나에 담은 것입니다. 아래 **복원 방법**대로 하면 원래 파일로 되돌릴 수 있습니다.",
+             f"> `lab.py pack-md`로 {today()}에 생성. 파일 {len(files)}개.", "",
+             "## 복원 방법", "",
+             "1. 아래 코드 블록을 `restore.py`라는 파일로 저장합니다.",
+             "2. `python restore.py 이_문서.md 출력폴더` 를 실행합니다. (출력폴더를 생략하면 현재 폴더)",
+             "3. 아래 파일 목록의 sha256 값으로 복원이 정확한지 확인할 수 있습니다.", "",
+             "````python", RESTORE_SNIPPET, "````", "",
+             "## 파일 목록", "", "| 파일 | 줄 수 | sha256 (앞 12자리) |", "|---|---|---|"]
+    for rp, text in files:
+        body = text[:-1] if text.endswith("\n") else text
+        digest = hashlib.sha256((body + "\n").encode("utf-8")).hexdigest()[:12]
+        lines.append(f"| `{rp}` | {body.count(chr(10)) + 1} | `{digest}` |")
+    if skipped:
+        lines += ["", "빠진 항목: " + ", ".join(skipped)]
+    lines += ["", "## 파일 내용"]
+    for rp, text in files:
+        body = text[:-1] if text.endswith("\n") else text
+        longest = max((len(m) for m in re.findall(r"`+", body)), default=0)
+        fence = "`" * max(3, longest + 1)
+        lines += ["", f"{FILE_HEADING}{rp}", f"{fence}{LANG_BY_SUFFIX.get(Path(rp).suffix, '')}", body, fence]
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"{out}에 파일 {len(files)}개를 묶었습니다" + (f" (빠진 항목 {len(skipped)}개: {', '.join(skipped)})" if skipped else ""))
+
+
+def cmd_unpack_md(args) -> None:
+    """pack-md로 만든 md 파일에서 원래 파일들을 복원한다 (복원 스크립트와 같은 규칙)."""
+    text = Path(args.md).read_text(encoding="utf-8")
+    out_dir = Path(args.out)
+    found = RESTORE_RE.findall(text)
+    if not found:
+        sys.exit("오류: 복원할 파일 블록이 없습니다")
+    for rel_path, _fence, body in found:
+        target = out_dir / rel_path.strip()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(body + "\n", encoding="utf-8")
+        print("복원:", target)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(prog="lab.py", description="ai-lab 연구실 도구")
     ap.add_argument("--lab", help="연구실 경로 (기본: 자동 탐색)")
@@ -703,6 +802,11 @@ def main() -> None:
     p.add_argument("--all", action="store_true"); p.set_defaults(fn=cmd_inbox)
     p = sub.add_parser("verify", help="실험 증거 감사"); p.add_argument("id"); p.set_defaults(fn=cmd_verify)
     p = sub.add_parser("digest", help="지식 요약본 만들기"); p.set_defaults(fn=cmd_digest)
+    p = sub.add_parser("pack-md", help="텍스트 파일들을 복원 가능한 md 하나로 묶기")
+    p.add_argument("paths", nargs="+"); p.add_argument("--out", required=True); p.add_argument("--title")
+    p.add_argument("--root", help="경로의 기준 폴더 (기본: 현재 폴더)"); p.set_defaults(fn=cmd_pack_md)
+    p = sub.add_parser("unpack-md", help="pack-md로 만든 md에서 파일 복원")
+    p.add_argument("md"); p.add_argument("--out", default="."); p.set_defaults(fn=cmd_unpack_md)
 
     args = ap.parse_args()
     args.fn(args)

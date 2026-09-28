@@ -1,6 +1,6 @@
 # ai-lab plugin — development repo
 
-This repo is the reusable *environment* (Claude Code plugin `ai-lab`), not research output. Research happens in separate workspaces created by `/ai-lab:new-lab`; never put research artifacts here. Labs run outside the company only; the company consumes offline releases (`/ai-lab:release`), so no company data ever enters a lab.
+This repo is the reusable *environment* (Claude Code plugin `ai-lab`), not research output. Research happens in separate workspaces created by `/ai-lab:new-lab`; never put research artifacts here. Labs run outside the company only; only markdown files can be carried into the company, so releases (`/ai-lab:release`) are .md documents plus an optional restorable code bundle (`lab.py pack-md`/`unpack-md`). No company data ever enters a lab; the company side is out of scope.
 
 - `.claude-plugin/` plugin.json + marketplace.json (marketplace `ai-sci-cowork`, published at github.com/yhlee52/ai_sci_cowork)
 - `agents/` researcher subagents (scout, engineer, critic, writer, ideator, archivist)

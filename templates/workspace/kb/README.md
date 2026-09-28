@@ -57,7 +57,7 @@
 | 실험 (계획, 코드, 결과, 보고서) | `research/experiments/EXP-NNN-*/` | EXP- |
 | 리뷰 | `research/reviews/REV-NNN.md` | REV- |
 | 과업 지시서 | `briefs/TASK-NNN.md` | TASK- |
-| 회사에서 쓸 릴리스 (독립 실행, 오프라인) | `research/releases/REL-NNN-*/` (README.md) | REL- |
+| 회사로 가져갈 릴리스 (md 파일만: 본문 + 선택적 코드 묶음) | `research/releases/REL-NNN-*/` (REL-NNN-*.md) | REL- |
 
 ## 모든 항목의 공통 필드 (JSON)
 

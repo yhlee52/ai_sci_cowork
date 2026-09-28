@@ -1,39 +1,45 @@
 ---
 name: release
-description: Package accepted research results (findings, code, reports) into a self-contained release that 교수님 can carry into an offline company network and use without Claude, the internet, or the lab's tooling.
+description: Package accepted research results as markdown-only documents that 교수님 can carry into the company (only .md files can be brought in) — a self-contained report, plus optionally the code packed into a restorable .md.
 argument-hint: "<F-/EXP-/H- ids to release> [purpose]"
 disable-model-invocation: true
 ---
 
-# Release — results for use inside the company
+# Release — results for use inside the company (markdown files only)
 
-The lab runs outside; inside the company only releases are used. A release must work **offline, without Claude and without this workspace**, and must say honestly what it does and does not show. Tool: `python "${CLAUDE_PLUGIN_ROOT}/scripts/lab.py"`.
+The lab runs outside the company. Only **.md files** can be brought inside, and inside there is no Claude, no git, and no lab tooling. So a release is a small set of markdown documents that stand on their own: they explain the result honestly and, if 교수님 wants, carry the code in a form that can be restored to files. Everything is written in Korean. Tool: `python "${CLAUDE_PLUGIN_ROOT}/scripts/lab.py"`.
 
 ## 1. Scope — class C, confirm with 교수님 first
-1. Resolve the ids in `$ARGUMENTS` with `lab.py context <id>`. Collect: findings (F-), their experiments (EXP-), reports, the code paths (`src/`, the `labkit` modules they import), datasets (DS-) and methods (M-).
+1. Resolve the ids in `$ARGUMENTS` with `lab.py context <id>`. Collect findings (F-), their experiments (EXP-), reports, reviews, datasets (DS-), methods (M-), and the code the experiments use (`src/`, imported `labkit` modules).
 2. Check before proposing:
-   - Findings should be `accepted`. `provisional` or pilot-only results may go only if 교수님 explicitly agrees, and are labelled **"미확정"** everywhere in the release.
+   - Findings should be `accepted`. `provisional` or pilot-only results go in only if 교수님 explicitly agrees, and are marked **"미확정"** everywhere.
    - `lab.py verify` PASS for each included experiment.
-   - Licenses: for every dataset, pretrained model, and copied code (P-/DS-/M- entries, their URLs), note the license and whether **commercial/company use** is allowed. Unknown = flag it.
-3. Show 교수님 a short list: what goes in (code, report, figures, config, optional weights with size), what is excluded, license flags, open caveats. **Wait for approval.**
+   - Licenses of datasets, pretrained models and copied code (P-/DS-/M- entries): note whether **company use** is allowed. Unknown → flag it.
+3. Ask 교수님 and **wait**:
+   - what goes in / what is left out, license flags, open caveats;
+   - whether to include the **code bundle** (yes/no, and which files).
+   - Note that images and model weights cannot travel as .md: key figures become tables, and weights must be re-trained inside with the included code (say how long it took here).
 
 ## 2. Build `research/releases/REL-xxx-<slug>/` (`lab.py next release`)
-```
-README.md          (Korean) — first lines: `# REL-xxx: <title>` and `> status: released | tags | session | summary`
-                   sections: 무엇을 주는가 · 근거 (F-/EXP- ids, 결과 표 mean±std, n) · 적용 범위와 한계 (scope_limits, 검증하지 않은 조건)
-                   · 사용법 (offline install, run commands, expected output) · 재현 정보 (git commit, seeds, env, GPU) · 라이선스 · 미확정 항목
-code/              only what is needed: experiment src + the labkit modules it imports (copied, so it runs standalone)
-configs/           the configs that produced the reported numbers
-results/           results.json, report.md, figures/
-requirements.txt   `uv export --format requirements-txt --no-hashes > requirements.txt` (pinned versions)
-weights/           only if approved (large files are delivered separately; list sha256 in README)
-MANIFEST.txt       every file with sha256 (generate with a short python script)
-```
-- All release text is Korean (README, comments, messages). Rewrite imports/paths so `code/` runs from the release root; do a clean-room test in a fresh venv with only `requirements.txt` (`uv venv .rel-venv && uv pip install -r requirements.txt --python .rel-venv`), run the smallest command from 사용법, then delete the venv.
-- Offline install note in README: on an internet-connected machine run `pip download -r requirements.txt -d wheels/`, carry `wheels/` in, then `pip install --no-index --find-links wheels/ -r requirements.txt` (CUDA torch wheels: from the PyTorch index matching the company GPU/driver).
-- Never include: `kb/`, `meetings/`, `briefs/`, agent memory, API keys/tokens, `.env`, absolute personal paths.
+
+**`REL-xxx-<slug>.md` — the main document** (always). First lines `# REL-xxx: <title>` and `> status: released | tags | session | summary`. Sections:
+- `## 한 줄 요약`
+- `## 무엇을 주는가` — the method/finding in plain words, and when to use it
+- `## 근거` — F-/EXP- ids (for traceability), result tables copied exactly from results.json (condition × metric, mean±std, n), what the review concluded
+- `## 적용 범위와 한계` — `scope_limits`, untested conditions, what must NOT be claimed
+- `## 사용 방법` — step by step for someone inside the company: restore the code (if bundled), required packages with pinned versions, the command to run, expected output and runtime, hardware used here
+- `## 재현 정보` — git commit, seeds, configs (inline, short), environment
+- `## 라이선스` — per dataset/model/code, company-use yes/no/unknown
+- `## 미확정 항목` — if any
+- `## 부록: 핵심 그림을 표로` — the numbers behind each important figure
+
+**`REL-xxx-<slug>-코드.md` — the code bundle** (only if approved):
+- Collect exactly the files needed to run: experiment `src/` + the `labkit` modules it imports + configs + a `requirements.txt` written with `uv export --format requirements-txt --no-hashes`. Rewrite imports/paths so the code runs from the bundle root, in a temporary staging folder (not in the lab's own sources).
+- Pack: `lab.py pack-md <staging paths> --root <staging> --out research/releases/REL-xxx-<slug>/REL-xxx-<slug>-코드.md --title "REL-xxx 코드 묶음"`. The bundle embeds its own restore script and a sha256 list.
+- **Round-trip test (mandatory):** `lab.py unpack-md <bundle> --out <temp dir>`, then in that temp dir `uv venv .rel-venv && uv pip install -r requirements.txt --python .rel-venv`, run the smallest command from `## 사용 방법`, confirm it works, then delete the temp dir.
+
+Never include: `kb/`, `meetings/`, `briefs/`, agent memory, API keys/tokens, `.env`, absolute personal paths, data files.
 
 ## 3. Record
-- Zip it (`REL-xxx-<slug>.zip` next to the folder; zips and weights stay out of git — add to `.gitignore` if needed).
-- Append a line to the current `meetings/session_NNN.md` under `## 릴리스`: REL id, included ids, 교수님's approval, caveats. The archivist files it.
-- Tell 교수님 (Korean, ≤8 lines): path, size, what it contains, license flags, and what must NOT be claimed from it.
+- Append to the current `meetings/session_NNN.md` under `## 릴리스`: REL id, included ids, whether code was bundled, 교수님's approval, caveats. The archivist files it.
+- Tell 교수님 (≤8 lines): the file paths (these .md files are what to carry in), their sizes, what they contain, license flags, and what must NOT be claimed from them.

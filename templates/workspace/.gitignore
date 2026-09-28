@@ -9,6 +9,4 @@ data/
 *.safetensors
 wandb/
 .ipynb_checkpoints/
-research/releases/*.zip
-research/releases/*/weights/
 .rel-venv/

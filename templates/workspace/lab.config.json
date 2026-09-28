@@ -1,0 +1,43 @@
+{
+  "lab_name": "{{LAB_NAME}}",
+  "created": "{{DATE}}",
+  "language": "ko",
+  "budget_profile": "economy",
+  "cycle_sessions": 3,
+  "profiles": {
+    "economy": {
+      "meeting_rounds": 2,
+      "speakers_per_round": 3,
+      "review_passes": 1,
+      "max_parallel_agents": 1,
+      "literature_sources": 5,
+      "brainstorm_agents": 3,
+      "ideas_per_agent": 3
+    },
+    "standard": {
+      "meeting_rounds": 3,
+      "speakers_per_round": 4,
+      "review_passes": 1,
+      "max_parallel_agents": 2,
+      "literature_sources": 8,
+      "brainstorm_agents": 4,
+      "ideas_per_agent": 4
+    },
+    "deep": {
+      "meeting_rounds": 4,
+      "speakers_per_round": 6,
+      "review_passes": 2,
+      "max_parallel_agents": 3,
+      "literature_sources": 15,
+      "brainstorm_agents": 6,
+      "ideas_per_agent": 4
+    }
+  },
+  "compute": {
+    "device": "cuda",
+    "gpu": "NVIDIA GeForce RTX 3060 Ti (8GB)",
+    "max_run_minutes": 30,
+    "smoke_test_first": true,
+    "python_env": "uv (pyproject.toml in workspace root)"
+  }
+}

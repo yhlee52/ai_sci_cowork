@@ -1,0 +1,12 @@
+{
+  "name": "ai-sci-cowork",
+  "description": "AI 연구원들로 이루어진 ML/DL 연구실 환경 (Claude Code plugin).",
+  "owner": { "name": "Yonghoon Lee", "url": "https://github.com/yhlee52" },
+  "plugins": [
+    {
+      "name": "ai-lab",
+      "source": "./",
+      "description": "ML/DL AI 연구실: 교수님과의 랩미팅, 문헌 조사, 실험 구현과 실행, 비평, 지식베이스, 회사용 릴리스."
+    }
+  ]
+}

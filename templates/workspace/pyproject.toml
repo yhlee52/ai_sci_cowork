@@ -1,0 +1,25 @@
+[project]
+name = "ai-lab-experiments"
+version = "0.1.0"
+description = "Experiment environment for the {{LAB_NAME}} lab"
+requires-python = ">=3.11,<3.14"
+dependencies = []
+
+# labkit (shared lab code) is installed in editable mode by `uv sync`,
+# so `from labkit import Run` works from any experiment directory.
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["labkit"]
+
+# CUDA wheels for torch/torchvision. Add them with: uv add torch torchvision
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }

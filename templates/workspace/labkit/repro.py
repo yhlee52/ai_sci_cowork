@@ -40,13 +40,20 @@ def report_metric(name: str, value: float) -> None:
     print(f"LAB_METRIC {name}={float(value):.10g}", flush=True)
 
 
-def get_device(prefer: str = "cuda"):
+def get_device(prefer: str | None = None):
+    """연구실 운영 제약(compute.limits.device)의 장치. 쓸 수 없으면 CPU. CUDA면 VRAM 예산도 건다."""
     try:
         import torch
     except ImportError:
         return "cpu"
+    from .limits import apply_vram_cap, lab_limits
+    prefer = prefer or lab_limits().get("device", "cuda")
     if prefer == "cuda" and torch.cuda.is_available():
+        apply_vram_cap()
         return torch.device("cuda")
+    mps = getattr(torch.backends, "mps", None)
+    if prefer == "mps" and mps is not None and mps.is_available():
+        return torch.device("mps")
     return torch.device("cpu")
 
 

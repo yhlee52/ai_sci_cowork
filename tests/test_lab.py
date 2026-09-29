@@ -173,6 +173,71 @@ class TestStateSafety(unittest.TestCase):
         self.assertEqual(index.stat().st_mtime_ns, before)  # 내용이 같으면 다시 쓰지 않는다
 
 
+def load_lab_module():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("lab_module", LAB_PY)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+class TestHardware(unittest.TestCase):
+    """하드웨어 탐색 → 운영 제약(compute.limits) 자동 설정."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp.name)
+        self.lab = make_lab(self.tmp)
+        self.cfg_path = self.lab / "lab.config.json"
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def cfg(self) -> dict:
+        return json.loads(self.cfg_path.read_text(encoding="utf-8"))
+
+    def test_init_detects_and_sets_limits(self):
+        comp = self.cfg()["compute"]
+        self.assertIn(comp["hardware"]["accelerator"], ("cuda", "mps", "cpu"))
+        self.assertEqual(comp["limits"]["device"], comp["hardware"]["accelerator"])
+        for key in ("precision", "max_train_params_m", "parallel_runs", "dataloader_workers"):
+            self.assertIn(key, comp["limits"])
+        out = lab(self.lab, "hw").stdout
+        self.assertIn("운영 제약", out)
+
+    def test_overrides_win_and_unknown_keys_warn(self):
+        cfg = self.cfg()
+        cfg["compute"]["overrides"] = {"dataloader_workers": 3, "없는키": 1}
+        self.cfg_path.write_text(json.dumps(cfg, ensure_ascii=False), encoding="utf-8")
+        out = lab(self.lab, "hardware").stdout
+        self.assertEqual(self.cfg()["compute"]["limits"]["dataloader_workers"], 3)
+        self.assertIn("없는키", out)
+
+    def test_other_pc_triggers_redetection(self):
+        cfg = self.cfg()
+        cfg["compute"]["hardware"]["machine_id"] = "other-pc"
+        self.cfg_path.write_text(json.dumps(cfg, ensure_ascii=False), encoding="utf-8")
+        out = lab(self.lab, "status", "--hook").stdout
+        self.assertIn("새로 탐색", out)
+        self.assertNotEqual(self.cfg()["compute"]["hardware"]["machine_id"], "other-pc")
+        self.assertNotIn("새로 탐색", lab(self.lab, "status", "--hook").stdout)  # 같은 PC면 다시 탐색하지 않는다
+
+    def test_derive_limits_rules(self):
+        m = load_lab_module()
+        gpu = {"accelerator": "cuda", "os": "Windows 10", "cpu_cores": 12, "ram_gb": 32.0,
+               "gpus": [{"name": "RTX 3060 Ti", "vram_gb": 8.0, "compute_cap": "8.6"}]}
+        lim = m.derive_limits(gpu)
+        self.assertEqual((lim["precision"], lim["vram_budget_gb"], lim["max_train_params_m"]), ("bf16", 7.2, 200))
+        self.assertEqual((lim["parallel_runs"], lim["dataloader_workers"]), (1, 0))
+        old = dict(gpu, os="Linux 6.1", gpus=[{"name": "T4", "vram_gb": 16.0, "compute_cap": "7.5"}])
+        lim = m.derive_limits(old)
+        self.assertEqual((lim["precision"], lim["dataloader_workers"]), ("fp16", 6))
+        cpu = {"accelerator": "cpu", "os": "Linux 6.1", "cpu_cores": 4, "ram_gb": 16.0, "gpus": []}
+        lim = m.derive_limits(cpu, {"max_train_params_m": 3})
+        self.assertNotIn("vram_budget_gb", lim)
+        self.assertEqual((lim["precision"], lim["max_train_params_m"]), ("fp32", 3))
+
+
 class TestCampaign(unittest.TestCase):
     """제안은 AI, 판정은 코드: 채택/기각/규칙 위반/실패/가짜 지표/멈춤/확인 실험/장부 위조 탐지."""
 

@@ -20,11 +20,11 @@ Research workspace driven by the `ai-lab` plugin. The human user is **교수님*
 Long-term `ROADMAP.md` (요약 is injected) · mid-term `state/cycle.md` (injected) · short-term `state/lab_state.md` (injected; 인계 메모 first) · knowledge `kb/digest.md` (one page) and `kb/map.md` (research map) → `lab.py find|show|context|history <ID>` for specifics.
 - Never bulk-read `kb/`, `meetings/`, `research/`, or `runs/`. Delegate heavy work with a brief (`briefs/TASK-xxx.md`); subagents return ≤10 lines.
 - Every task/experiment states its chain: `MS-n → Q- → H- → EXP-/CMP- → TASK-`.
-- Budget knobs: `lab.config.json` → `profiles[budget_profile]`, `campaign`, `cycle_sessions`. Obey them.
+- Budget knobs: `lab.config.json` → `profiles[budget_profile]`, `campaign`, `cycle_sessions`, and `compute.limits` (hardware constraints auto-detected on this PC, shown in the session status). Obey them; never assume other hardware.
 - IDs, actions, inbox, index, digest, map come from `lab.py` only; don't hand-edit files under `state/*.json`, `kb/index.json`, `kb/digest.md`, `kb/map.md`, or campaign `ledger.tsv`/`state.json`.
 
 ## Workflow
-Cycle start `/ai-lab:lab-meeting plan` → per session: `lab-meeting` (progress/review/journal) · `/ai-lab:brainstorm` · `/ai-lab:work` · `/ai-lab:campaign` (bounded autonomous search, e.g. overnight) → session end `/ai-lab:archive` → cycle end `/ai-lab:lab-meeting retro`. Write-ups: `/ai-lab:paper`, `/ai-lab:release`. Overview: `/ai-lab:lab-status`.
+Cycle start `/ai-lab:lab-meeting plan` → per session: `lab-meeting` (progress/review/journal) · `/ai-lab:brainstorm` · `/ai-lab:work` · `/ai-lab:campaign` (bounded autonomous search, whenever 교수님 asks) → session end `/ai-lab:archive` → cycle end `/ai-lab:lab-meeting retro`. Write-ups: `/ai-lab:paper`, `/ai-lab:release`. Overview: `/ai-lab:lab-status`.
 
 ## Data boundary
 This lab runs outside the company; the company only receives releases (`/ai-lab:release`). Everything read here goes to the API, so **never ingest company data, internal code/docs/metrics, or customer information** — public data, public papers, or synthetic data only. If something looks company-internal, stop and ask 교수님.

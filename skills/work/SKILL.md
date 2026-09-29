@@ -10,7 +10,7 @@ Tool: `python "${CLAUDE_PLUGIN_ROOT}/scripts/lab.py"` (`action`, `inbox`, `next`
 
 ## 1. Select
 - `lab.py action list`. Take the ids in `$ARGUMENTS`, or all open items not owned by `professor`.
-- Profile from `lab.config.json` (`max_parallel_agents`, `review_passes`, `literature_sources`) and `compute`.
+- Profile from `lab.config.json` (`max_parallel_agents`, `review_passes`, `literature_sources`) and `compute.limits` (the hardware constraints detected on this PC — every plan must fit them).
 - Skip items that depend on an open inbox (ASK) decision — say so.
 - Order by dependency (literature → plan/pilot → full run → report → review). At most `max_parallel_agents` subagents at once; independent items may run in parallel.
 

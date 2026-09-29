@@ -9,6 +9,7 @@ from typing import Callable
 
 import torch
 
+from .limits import lab_limits
 from .repro import get_device
 from .run import Run
 
@@ -20,8 +21,10 @@ def fit(model: torch.nn.Module, optimizer: torch.optim.Optimizer, loss_fn: Calla
     """학습하고, `monitor` 기준 최고 평가 지표(없으면 마지막 지표)를 돌려준다. runs/<id>/ckpt.pt가 있으면 이어서 학습한다."""
     device = get_device()
     model.to(device)
-    use_amp = amp and device.type == "cuda"
-    scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
+    precision = lab_limits().get("precision", "fp16")  # 연구실이 탐색한 GPU에 맞춘 정밀도 (bf16이면 GradScaler가 필요 없다)
+    amp_dtype = torch.bfloat16 if precision == "bf16" else torch.float16
+    use_amp = amp and device.type == "cuda" and precision != "fp32"
+    scaler = torch.amp.GradScaler("cuda", enabled=use_amp and amp_dtype == torch.float16)
     ckpt = run.dir / "ckpt.pt"
     start_epoch, step, best = 0, 0, None
     if ckpt.exists():
@@ -39,7 +42,7 @@ def fit(model: torch.nn.Module, optimizer: torch.optim.Optimizer, loss_fn: Calla
         for xb, yb in train_loader:
             xb, yb = xb.to(device, non_blocking=True), yb.to(device, non_blocking=True)
             optimizer.zero_grad(set_to_none=True)
-            with torch.autocast(device_type=device.type, enabled=use_amp):
+            with torch.autocast(device_type=device.type, dtype=amp_dtype, enabled=use_amp):
                 loss = loss_fn(model(xb), yb)
             scaler.scale(loss).backward()
             if grad_clip:

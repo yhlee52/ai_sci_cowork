@@ -9,7 +9,8 @@
 | `stats.py` | `compare(treat, base, goal)` 부트스트랩 신뢰구간 비교 (판정: 개선 / 악화 / 판단 불가), `bootstrap_ci`, `summarize` |
 | `leakage.py` | `check_overlap(train, test)` — 평가 데이터가 학습 데이터와 겹치는지 (결과가 너무 좋을 때 가장 먼저) |
 | `train.py` | `fit(...)` — AMP, 기울기 자르기, 평가, 시간 예산, 체크포인트 이어하기를 갖춘 PyTorch 학습 루프 |
-| `repro.py` | `seed_everything`, `get_device`, `git_commit`, `env_info`, `seed_from_env`(캠페인이 주는 시드), `report_metric`(캠페인이 읽는 `LAB_METRIC 이름=값` 출력) |
+| `limits.py` | `lab_limits()` — `lab.py hardware`가 이 PC를 탐색해 건 운영 제약(장치, 정밀도, VRAM 예산, 모델 크기, DataLoader workers). `Run`과 `get_device()`가 VRAM 예산을 자동으로 걸고, `Run`이 최대 VRAM 사용량(`peak_vram_gb`)을 기록한다 |
+| `repro.py` | `seed_everything`, `get_device`(운영 제약의 장치), `git_commit`, `env_info`, `seed_from_env`(캠페인이 주는 시드), `report_metric`(캠페인이 읽는 `LAB_METRIC 이름=값` 출력) |
 | `plot.py` | `setup_korean_plot()` — 그림의 제목, 축, 범례를 한글로 쓸 수 있게 글꼴을 설정한다 |
 
 ## 전형적인 실험 코드
@@ -31,6 +32,12 @@ print(res["comparisons"]["ours"]["val_acc"]["verdict"])   # 예: "개선 (95% �
 ```
 
 그다음 `lab.py audit EXP-001`로 결과 파일이 실행 기록과 같은지, 계획대로 했는지, 보고서의 숫자가 결과 파일에 있는지 확인한다.
+
+## 하드웨어 제약 지키기
+
+- 모델, 배치 크기, 정밀도는 `lab_limits()`에 맞춘다. 하드웨어를 짐작해서 가정하지 않는다.
+- DataLoader는 `num_workers=lab_limits().get("dataloader_workers", 0)`.
+- 파일럿의 `최대 VRAM`(실행 끝 줄, `metrics.json`의 `peak_vram_gb`)을 보고 본 실험 크기를 정한다. 예산을 넘으면 메모리 부족 오류로 멈추므로, 배치를 줄이거나 기울기 누적을 쓴다.
 
 ## 캠페인(자율 탐색)용 코드
 

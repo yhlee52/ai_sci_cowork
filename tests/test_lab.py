@@ -9,6 +9,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -124,6 +125,52 @@ print("학습 완료")
 EVALUATE = """import json
 print(f"LAB_METRIC val_loss={json.load(open('out.json'))['loss']}")
 """
+
+
+class TestStateSafety(unittest.TestCase):
+    """병렬 agent가 lab.py를 동시에 불러도 ID와 대기함이 깨지지 않는지, 쓰기가 원자적인지."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp.name)
+        self.lab = make_lab(self.tmp)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_parallel_calls_keep_ids_unique(self):
+        cmds = [["next", "idea"]] * 10 + [["inbox", "add", "--question", f"질문 {i}"] for i in range(6)]
+        procs = [subprocess.Popen([sys.executable, str(LAB_PY), *c], cwd=str(self.lab), env=ENV,
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8")
+                 for c in cmds]
+        outs = [p.communicate(timeout=120) for p in procs]
+        self.assertTrue(all(p.returncode == 0 for p in procs), [o[1] for o in outs])
+        ideas = [o[0].strip() for o, c in zip(outs, cmds) if c[0] == "next"]
+        self.assertEqual(sorted(ideas), [f"IDEA-{i:03d}" for i in range(1, 11)])
+        asks = json.loads((self.lab / "state" / "inbox.json").read_text(encoding="utf-8"))
+        self.assertEqual(sorted(q["id"] for q in asks), [f"ASK-{i:03d}" for i in range(1, 7)])
+        self.assertFalse((self.lab / "state" / ".lock").exists())
+        self.assertEqual(list(self.lab.rglob(".*.tmp")), [])
+
+    def test_stale_lock_is_cleared(self):
+        lock = self.lab / "state" / ".lock"
+        lock.write_text("", encoding="utf-8")
+        old = time.time() - 600
+        os.utime(lock, (old, old))
+        self.assertEqual(lab(self.lab, "next", "exp").stdout.strip(), "EXP-001")
+        self.assertFalse(lock.exists())
+
+    def test_reads_do_not_rewrite_index(self):
+        index = self.lab / "kb" / "index.json"
+        index.unlink(missing_ok=True)
+        lab(self.lab, "find", "아무거나")
+        lab(self.lab, "show", "S-001", check=False)
+        self.assertFalse(index.exists())
+        lab(self.lab, "index")
+        before = index.stat().st_mtime_ns
+        time.sleep(0.05)
+        lab(self.lab, "index")
+        self.assertEqual(index.stat().st_mtime_ns, before)  # 내용이 같으면 다시 쓰지 않는다
 
 
 class TestCampaign(unittest.TestCase):

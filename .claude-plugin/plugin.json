@@ -1,7 +1,7 @@
 {
   "name": "ai-lab",
   "displayName": "AI Scientist Lab",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "AI 연구원들로 이루어진 작은 ML/DL 연구실: 교수님(사용자)과의 랩미팅, 문헌 조사, 실험 구현과 실행, 비평, 승인된 범위 안의 밤샘 자율 탐색(판정은 코드), 감사, ID로 찾아 읽는 지식베이스, 회사로 가져갈 md 릴리스. 모든 산출물은 한글.",
   "author": { "name": "Yonghoon Lee", "url": "https://github.com/yhlee52" },
   "homepage": "https://github.com/yhlee52/ai_sci_cowork",

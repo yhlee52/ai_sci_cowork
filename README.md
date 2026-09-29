@@ -36,14 +36,19 @@ ML/DL 연구를 하는 작은 AI 연구 그룹을 Claude Code의 agent, skill, h
 
 ## 설치
 
-Claude Code 채팅창에서 아래 두 줄을 한 번만 실행한다. GitHub에서 바로 받아 오므로 어느 PC에서나 같다.
+아래 두 명령을 한 번만 실행한다. GitHub에서 바로 받아 오므로 어느 PC에서나 같다.
 
 ```
+# 터미널 CLI 대화창
 /plugin marketplace add yhlee52/ai_sci_cowork
 /plugin install ai-lab@ai-sci-cowork
+
+# VSCode 확장 사용 시: 채팅창은 /plugin 미지원 → VSCode 터미널에서
+claude plugin marketplace add yhlee52/ai_sci_cowork
+claude plugin install ai-lab@ai-sci-cowork
 ```
 
-GitHub에 새 버전이 올라가면 `/plugin marketplace update ai-sci-cowork`로 받아 온다.
+GitHub에 새 버전이 올라가면 `claude plugin marketplace update ai-sci-cowork` 후 `claude plugin update ai-lab@ai-sci-cowork`(CLI 대화창에서는 `/plugin marketplace update ai-sci-cowork`)로 받아 온다. `claude`가 PATH에 없으면 VSCode 확장에 들어 있는 `claude.exe`를 쓴다 ([사용설명서 3장](docs/사용설명서.md#3-설치하기)).
 
 ## 사용법
 

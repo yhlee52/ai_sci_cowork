@@ -32,6 +32,7 @@ agent가 필요한 것만 읽도록 돕는다. 모든 출력은 한글이다.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime as dt
 import difflib
 import hashlib
@@ -182,16 +183,81 @@ def load_json(path: Path, default):
         return default
 
 
-def save_json(path: Path, data) -> None:
+def write_atomic(path: Path, text: str) -> None:
+    """임시 파일에 끝까지 쓴 뒤 한 번에 바꿔 끼운다. 쓰는 도중 꺼져도(절전, 정전, 강제 종료)
+    파일이 반쯤 잘린 채 남지 않는다 — 밤샘 캠페인의 state.json이나 counters.json이 깨지면 이어 갈 수 없다."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+        for attempt in range(40):
+            try:
+                os.replace(tmp, path)
+                return
+            except PermissionError:  # Windows: 다른 프로세스가 그 파일을 잠깐 열고 있으면 교체가 거부된다
+                if attempt == 39:
+                    raise
+                time.sleep(0.05)
+    finally:
+        with contextlib.suppress(OSError):
+            tmp.unlink()
+
+
+def save_json(path: Path, data) -> None:
+    write_atomic(path, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+
+
+LOCK_WAIT_S = 30
+LOCK_STALE_S = 120
+_lock_depth = 0
+
+
+@contextlib.contextmanager
+def state_lock(lab: Path):
+    """state/*.json을 읽고-고치고-쓰는 동안 다른 lab.py가 끼어들지 못하게 한다.
+    병렬로 돈 agent 둘이 동시에 ID를 받으면 같은 ID가 두 번 나갈 수 있기 때문이다. 같은 프로세스 안에서는 겹쳐 써도 된다."""
+    global _lock_depth
+    if _lock_depth:
+        _lock_depth += 1
+        try:
+            yield
+        finally:
+            _lock_depth -= 1
+        return
+    path = lab / "state" / ".lock"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    deadline = time.monotonic() + LOCK_WAIT_S
+    while True:
+        try:
+            os.close(os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+            break
+        except (FileExistsError, PermissionError):
+            with contextlib.suppress(OSError):
+                if time.time() - path.stat().st_mtime > LOCK_STALE_S:
+                    path.unlink()  # 도중에 죽은 프로세스가 남긴 잠금
+                    continue
+            if time.monotonic() > deadline:
+                sys.exit(f"오류: 다른 lab.py가 {LOCK_WAIT_S}초 넘게 state/.lock을 쥐고 있습니다. "
+                         f"실행 중인 lab.py가 없다면 state/.lock 파일을 지우고 다시 실행하세요")
+            time.sleep(0.05)
+    _lock_depth = 1
+    try:
+        yield
+    finally:
+        _lock_depth = 0
+        with contextlib.suppress(OSError):
+            path.unlink()
 
 
 def alloc(lab: Path, kind: str) -> str:
     path = lab / "state" / "counters.json"
-    counters = load_json(path, {})
-    counters[kind] = counters.get(kind, 0) + 1
-    save_json(path, counters)
+    with state_lock(lab):
+        counters = load_json(path, {})
+        counters[kind] = counters.get(kind, 0) + 1
+        save_json(path, counters)
     return f"{KINDS[kind][0]}{counters[kind]:03d}"
 
 
@@ -271,14 +337,17 @@ def build_index(lab: Path) -> list[dict]:
 
 def write_index(lab: Path) -> list[dict]:
     rows = build_index(lab)
-    save_json(lab / "kb" / "index.json",
-              {"generated": today(), "note": "자동 생성 캐시입니다. 권위는 개별 파일에 있습니다. 직접 고치지 마세요.",
-               "entries": rows})
+    path = lab / "kb" / "index.json"
+    if load_json(path, {}).get("entries") != rows:  # 내용이 같으면 다시 쓰지 않는다 (날짜만 바뀐 변경을 git에 남기지 않도록)
+        save_json(path, {"generated": today(), "note": "자동 생성 캐시입니다. 권위는 개별 파일에 있습니다. 직접 고치지 마세요.",
+                         "entries": rows})
     return rows
 
 
 def get_index(lab: Path) -> list[dict]:
-    return write_index(lab)  # 연구실 규모에서는 매번 새로 만들어도 충분히 빠르다
+    # 읽기 명령(find, show, context …)은 파일을 쓰지 않는다. 병렬 agent가 동시에 불러도 안전하다.
+    # 연구실 규모에서는 매번 새로 만들어도 충분히 빠르다. kb/index.json은 index, digest, status가 갱신한다.
+    return build_index(lab)
 
 
 def line(r: dict) -> str:
@@ -439,6 +508,11 @@ def cycle_meta(lab: Path) -> dict | None:
 def cmd_inbox(args) -> None:
     """교수님만 정할 수 있는 질문. agent가 올리고, 메인 세션이 여쭙고 기록한다."""
     lab = need_lab(args)
+    with state_lock(lab):  # 두 agent가 동시에 올려도 한쪽 질문이 사라지지 않도록
+        _inbox(lab, args)
+
+
+def _inbox(lab: Path, args) -> None:
     path = lab / "state" / "inbox.json"
     items = load_json(path, [])
     if args.op == "add":
@@ -600,12 +674,17 @@ def cmd_digest(args) -> None:
     if len(lines) == 2:
         lines.append("\n(아직 쌓인 지식이 없습니다)")
     (lab / "kb").mkdir(exist_ok=True)
-    (lab / "kb" / "digest.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    write_atomic(lab / "kb" / "digest.md", "\n".join(lines) + "\n")
     print(f"kb/digest.md를 만들었습니다 ({len(lines)}줄)")
 
 
 def cmd_action(args) -> None:
     lab = need_lab(args)
+    with state_lock(lab):
+        _action(lab, args)
+
+
+def _action(lab: Path, args) -> None:
     path = lab / "state" / "actions.json"
     actions = load_json(path, [])
     if args.op == "add":
@@ -908,7 +987,8 @@ def set_md_status(md: Path, status: str) -> None:
         return
     text = md.read_text(encoding="utf-8")
     new = re.sub(r"(?m)^(>\s*status:\s*)[^|\n]*", lambda m: m.group(1) + status + " ", text, count=1)
-    md.write_text(new, encoding="utf-8")
+    if new != text:
+        write_atomic(md, new)  # plan.md(사전 등록), campaign.md(계약)가 잘리면 되돌릴 수 없다
 
 
 def _kill_tree(p: subprocess.Popen) -> None:
@@ -2006,7 +2086,7 @@ def cmd_map(args) -> None:
               "  classDef idle fill:#fff,stroke:#999"]
     out = ["# 연구 지도", f"> {today()}에 `lab.py map`이 자동 생성함. 초록=확정/지지, 파랑=진행 중, 회색=반박/폐기. "
            "GitHub에서는 그림으로 보이고, VSCode에서는 mermaid 미리보기 확장이 있으면 보인다.", "", "```mermaid", *lines, "```"]
-    (lab / "kb" / "map.md").write_text("\n".join(out) + "\n", encoding="utf-8")
+    write_atomic(lab / "kb" / "map.md", "\n".join(out) + "\n")
     print(f"kb/map.md를 만들었습니다 (항목 {len(rows) + len(ms_rows)}개, 연결 {len(edges)}개)")
 
 

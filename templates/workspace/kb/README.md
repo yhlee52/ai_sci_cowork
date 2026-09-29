@@ -51,10 +51,12 @@
 | 방법·모델 정의 (구현 경로, 검증된 하이퍼파라미터) | `kb/methods/M-NNN.json` | M- |
 | 운영 노하우: 함정, 환경 문제, 다시 하지 말 것 | `kb/lessons/L-NNN.json` | L- |
 | 연구실이 아는 것 1쪽 요약 (자동 생성) | `kb/digest.md` (`lab.py digest`) | — |
+| 연구 지도: 마일스톤→질문→가설→실험→결과 (자동 생성) | `kb/map.md` (`lab.py map`) | — |
 | 아이디어 제안 | `research/ideas/IDEA-NNN-*.md` | IDEA- |
 | 문헌 조사 노트 | `research/literature/LIT-NNN-*.md` | LIT- |
 | 브레인스토밍 (관점별 아이디어, 점수, 최종 후보) | `research/brainstorms/BS-NNN/` (summary.md) | BS- |
 | 실험 (계획, 코드, 결과, 보고서) | `research/experiments/EXP-NNN-*/` | EXP- |
+| 자율 탐색 캠페인 (계약, 장부, 시도별 변경·로그, 확인 실험) | `research/campaigns/CMP-NNN-*/` (campaign.md) | CMP- |
 | 리뷰 | `research/reviews/REV-NNN.md` | REV- |
 | 과업 지시서 | `briefs/TASK-NNN.md` | TASK- |
 | 회사로 가져갈 릴리스 (md 파일만: 본문 + 선택적 코드 묶음) | `research/releases/REL-NNN-*/` (REL-NNN-*.md) | REL- |
@@ -73,12 +75,24 @@
 |---|---|---|
 | 질문 `Q-` | `question`, `motivation`, `scope` | `open`(열림), `narrowed`(좁혀짐), `answered`(답변됨), `dropped`(중단됨) |
 | 가설 `H-` | `statement`(반증 가능한 문장), `prediction`(어떤 결과면 반박되는가), `question`(Q- id) | `proposed`(제안됨), `testing`(검증 중), `supported`(지지됨), `refuted`(반박됨), `inconclusive`(결론 없음), `abandoned`(폐기됨) |
-| 결과 `F-` | `statement`, `evidence`[경로/ID], `conditions`(성립하는 조건), `scope_limits`(검증하지 않은 범위), `confidence` `low/medium/high`, `supports`/`refutes`[H id], `decided_by`(`accepted`는 반드시 `교수님`) | `provisional`(잠정), `accepted`(확정), `superseded`(대체됨, `superseded_by` 기록) |
+| 결과 `F-` | `statement`, `result_type`(`positive`/`null`/`negative` — 효과 없음도 결과다), `evidence`[경로/ID], `conditions`(성립하는 조건), `scope_limits`(검증하지 않은 범위), `regime_shift_checked`(조건 이동 점검 여부), `confidence` `low/medium/high`, `supports`/`refutes`[H id], `decided_by`(`accepted`는 반드시 `교수님`) | `provisional`(잠정), `accepted`(확정), `superseded`(대체됨, `superseded_by` 기록) |
 | 결정 `D-` | `decision`, `reason`, `alternatives`, `dissent`[{who, view}], `class`(A/B/C), `decided_by` | `in_force`(유효), `revised`(수정됨), `revoked`(철회됨) |
 | 논문 `P-` | `authors`, `year`, `venue`, `url`, `arxiv`, `takeaway`(한 줄), `relevance`, `license`(있다면), `cited_in`[LIT id] | `skimmed`(훑어봄), `read`(읽음), `key`(핵심) |
 | 데이터셋 `DS-` | `source`, `url`, `size`, `splits`, `license`(회사 사용 가능 여부 포함), `loader`(코드 경로) | `candidate`(후보), `in_use`(사용 중), `retired`(사용 종료) |
 | 방법 `M-` | `description`, `impl`(코드 경로), `known_good_hparams`, `paper`(P id), `license` | `candidate`(후보), `implemented`(구현됨), `baseline`(베이스라인), `retired`(사용 종료) |
-| 교훈 `L-` | `lesson`(명령형 한 줄), `context`(무슨 일이 있었나), `applies_to`(예: engineer, 전체), `source`(EXP/REV/세션 id) | `active`(유효), `obsolete`(폐기됨) |
+| 교훈 `L-` | `lesson`(명령형 한 줄), `context`(무슨 일이 있었나), `applies_to`(예: engineer, explorer, 전체 — 실험 전략은 digest의 "실험 전략 기억"에 모인다), `source`(EXP/CMP/REV/세션 id) | `active`(유효), `obsolete`(폐기됨) |
+
+## 캠페인 폴더 (lab.py가 관리 — 손으로 고치지 않는다)
+
+| 파일 | 내용 |
+|---|---|
+| `campaign.md` | 교수님이 승인한 탐색 계약 (지표, 수정 가능 파일, 예산, 멈춤 조건, 승인 기록) |
+| `campaign.json`, `state.json` | 기계용 설정과 현재 상태 (최고안, 채택 문턱, 보호 파일 해시) |
+| `ledger.tsv` | 모든 시도의 장부: 시도, 부모, 시드, 지표, 개선량, 판정, 시간, 변경 줄 수, 설명 |
+| `trials/T-NNN.patch`, `.log` | 시도별 변경 내용과 실행 로그 (장부의 숫자는 로그에서 다시 계산해 검증된다) |
+| `baseline/`, `best/` | 원본 코드와 현재 최고안 |
+| `notes.md` | 탐색 중 얻은 교훈 (기록 담당이 L-로 옮긴다) |
+| `confirm.json`, `summary.md` | 새 시드 확인 실험 결과, 요약 보고서 |
 
 ## 마크다운 산출물의 머리말
 

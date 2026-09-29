@@ -1,7 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python *lab.py*)"
+      "Bash(python *lab.py*)",
+      "Edit(/research/**)",
+      "Edit(/briefs/**)",
+      "Edit(/meetings/**)",
+      "Edit(/kb/**)",
+      "Edit(/state/**)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(git push --force*)",
+      "Bash(git reset --hard*)"
     ]
   }
 }

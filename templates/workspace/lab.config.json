@@ -49,11 +49,11 @@
     "_설명": "자율 탐색 캠페인 기본값. 한 번의 시도는 7분 이하여야 한다 (명령 하나가 10분 안에 끝나야 함)."
   },
   "compute": {
-    "device": "cuda",
-    "gpu": "NVIDIA GeForce RTX 3060 Ti (8GB)",
     "max_run_minutes": 30,
     "smoke_test_first": true,
-    "python_env": "uv (pyproject.toml in workspace root)"
+    "python_env": "uv (pyproject.toml in workspace root)",
+    "overrides": {},
+    "_설명": "hardware와 limits는 lab.py가 이 PC를 탐색해 자동으로 채운다 (연구실을 만들 때, PC가 바뀐 뒤 첫 세션에서, lab.py hardware --refresh). 직접 고치지 말고, 제약을 바꾸려면 overrides에 같은 키로 적는다. 예: {\"vram_budget_gb\": 5}"
   },
   "git": {
     "auto_commit": true,

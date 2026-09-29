@@ -11,7 +11,7 @@ Design (from the co-scientist / ideation literature): independent parallel gener
 ## 0. Setup
 1. Profile from `lab.config.json`: `brainstorm_agents` (N), `ideas_per_agent`, `pilot_tournament`, compute budget. Lenses: those named in `$ARGUMENTS`, else the first N rows of the lens table in `team.md`.
 2. `lab.py next brainstorm` → `BS-xxx`; create `research/brainstorms/BS-xxx/`.
-3. Write `brief.md` there (≤40 lines, Korean): topic, goal chain (ROADMAP milestone → Q-/H-), constraints (8GB GPU, pilot ≤2 min, full-run budget), **what the lab already knows** and **what already failed** — from `kb/digest.md` ("실패한 방향", "효과 없음" sections) and 1–3 `lab.py find` queries, as one-liners with ids.
+3. Write `brief.md` there (≤40 lines, Korean): topic, goal chain (ROADMAP milestone → Q-/H-), constraints (the hardware limits from `lab.config.json → compute.limits` in one line, pilot ≤2 min, full-run budget), **what the lab already knows** and **what already failed** — from `kb/digest.md` ("실패한 방향", "효과 없음" sections) and 1–3 `lab.py find` queries, as one-liners with ids.
 
 ## 1. Generate — parallel, independent
 Launch N `ai-lab:ideator` subagents **in one message** (parallel). Each prompt: `Brainstorm dir research/brainstorms/BS-xxx/. Lens: <lens>. Ideas: <ideas_per_agent>. lab.py: python "${CLAUDE_PLUGIN_ROOT}/scripts/lab.py". Follow your agent instructions.` Nothing else — no hints from other lenses.

@@ -16,6 +16,7 @@ import logging
 import time
 from pathlib import Path
 
+from .limits import apply_vram_cap, lab_limits, peak_vram_gb, reset_peak_vram
 from .repro import env_info, git_commit, seed_everything
 
 STATUS_KO = {"complete": "완료", "partial": "부분 완료", "failed": "실패", "running": "실행 중"}
@@ -32,6 +33,7 @@ class Run:
         self.max_seconds = max_minutes * 60 if max_minutes else None
         self.status = "running"
         self.final: dict = {}
+        self.peak_vram_gb: float | None = None
         self._set_seed = set_seed
 
     # 컨텍스트 매니저 ----------------------------------------------------------
@@ -39,9 +41,11 @@ class Run:
         self.dir.mkdir(parents=True, exist_ok=True)
         if self._set_seed:
             seed_everything(self.seed)
+        apply_vram_cap()  # torch를 쓰는 실행이면 VRAM을 연구실 예산 안으로 묶는다
+        reset_peak_vram()
         self.t0 = time.time()
         meta = {"run_id": self.run_id, "condition": self.condition, "seed": self.seed,
-                "config": self.config, "git": git_commit(), "env": env_info(),
+                "config": self.config, "git": git_commit(), "env": env_info(), "limits": lab_limits(),
                 "started": time.strftime("%Y-%m-%d %H:%M:%S")}
         (self.dir / "config.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
         self.logger = logging.getLogger(f"labkit.{self.run_id}")
@@ -61,12 +65,17 @@ class Run:
         elif self.status == "running":
             self.status = "failed"
             self.logger.info("finish() 없이 종료됨 → 실패로 기록")
+        try:
+            self.peak_vram_gb = peak_vram_gb()
+        except Exception:
+            self.peak_vram_gb = None
         self._write_final(error=repr(exc) if exc else None)
         self._metrics.close()
         for h in list(self.logger.handlers):
             h.close()
             self.logger.removeHandler(h)
-        print(f"[{self.run_id}] {STATUS_KO.get(self.status, self.status)} {self.wall_minutes:.1f}분 " +
+        vram = f" 최대 VRAM {self.peak_vram_gb}GB" if self.peak_vram_gb is not None else ""
+        print(f"[{self.run_id}] {STATUS_KO.get(self.status, self.status)} {self.wall_minutes:.1f}분{vram} " +
               " ".join(f"{k}={v:.4g}" if isinstance(v, float) else f"{k}={v}" for k, v in self.final.items()))
         return False  # 예외를 삼키지 않는다
 
@@ -91,6 +100,8 @@ class Run:
     def _write_final(self, error: str | None) -> None:
         out = {"run_id": self.run_id, "condition": self.condition, "seed": self.seed, "status": self.status,
                "final": self.final, "wall_min": round(self.wall_minutes, 2)}
+        if self.peak_vram_gb is not None:
+            out["peak_vram_gb"] = self.peak_vram_gb
         if error:
             out["error"] = error
         (self.dir / "metrics.json").write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8")

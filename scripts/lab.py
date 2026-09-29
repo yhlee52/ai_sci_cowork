@@ -25,6 +25,7 @@ agent가 필요한 것만 읽도록 돕는다. 모든 출력은 한글이다.
   lab.py lint                           지식베이스 무결성 점검
   lab.py doctor [--torch]               실험 환경 진단
   lab.py map                            연구 지도(mermaid) 만들기 → kb/map.md
+  lab.py hardware [--refresh]           이 PC의 하드웨어 탐색 → 운영 제약(compute.limits) 자동 설정
 
 연구실 루트 = 현재 폴더에서 위로 올라가며 lab.config.json이 있는 첫 폴더
 (--lab 경로 또는 환경 변수 AI_LAB_DIR로 지정 가능).
@@ -40,6 +41,7 @@ import itertools
 import json
 import math
 import os
+import platform
 import random
 import re
 import shutil
@@ -398,6 +400,8 @@ def cmd_init(args) -> None:
     if args.git and not (dest / ".git").exists():
         subprocess.run(["git", "init", "-q"], cwd=dest, check=False)
     print(f"연구실을 만들었습니다: {dest}")
+    hw, lim, _ = ensure_hardware(dest, refresh=True)
+    print(f"이 PC의 하드웨어를 탐색해 운영 제약을 걸었습니다: {limits_line(hw, lim)}")
 
 
 def cmd_next(args) -> None:
@@ -457,6 +461,13 @@ def cmd_status(args) -> None:
     if serious:
         out.append(f"\n## 점검 경고 {len(serious)}건 (lab.py lint)")
         out += [f"- {m}" for m in serious[:5]]
+    try:
+        hw, lim, redetected = ensure_hardware(lab)
+        if lim:
+            note = " — 이 PC에서 새로 탐색함" if redetected else ""
+            out.append(f"\n## 하드웨어와 운영 제약 (자동 탐색{note}, 자세히: lab.py hardware)\n- {limits_line(hw, lim)}")
+    except Exception as e:  # 탐색 실패가 현황 보기를 막지 않는다
+        out.append(f"\n(하드웨어 탐색 실패: {e})")
     rows = write_index(lab)
     counts: dict[str, dict[str, int]] = {}
     for r in rows:
@@ -2007,6 +2018,165 @@ def cmd_lint(args) -> None:
     print(f"점검 결과: 실패 {fails}건, 경고 {sum(1 for l, _ in issues if l == '경고')}건, 정보 {sum(1 for l, _ in issues if l == '정보')}건")
 
 
+# ---------------------------------------------------------------- 하드웨어 탐색과 운영 제약
+
+VRAM_HEADROOM = 0.9      # 화면 출력과 다른 프로그램 몫으로 10%는 남긴다
+BYTES_PER_PARAM = 18     # AdamW 혼합 정밀도 학습에서 파라미터 하나당 가중치·기울기·옵티마이저 상태 (대략)
+ACTIVATION_SHARE = 0.5   # 메모리의 절반은 활성값(activation)과 배치 몫으로 남긴다
+CPU_TRAIN_PARAMS_M = 10  # GPU가 없으면 메모리보다 속도가 한계다
+
+
+def _machine_id() -> str:
+    """이 PC를 알아보는 짧은 지문. 호스트 이름을 그대로 저장하지 않는다."""
+    raw = f"{platform.node()}|{platform.system()}|{platform.machine()}|{os.cpu_count()}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
+
+
+def _ram_gb() -> float | None:
+    try:
+        if sys.platform == "win32":
+            import ctypes
+
+            class _MemStatus(ctypes.Structure):
+                _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong)] + [
+                    (n, ctypes.c_ulonglong) for n in ("ullTotalPhys", "ullAvailPhys", "ullTotalPageFile",
+                                                      "ullAvailPageFile", "ullTotalVirtual", "ullAvailVirtual",
+                                                      "ullAvailExtendedVirtual")]
+            m = _MemStatus()
+            m.dwLength = ctypes.sizeof(_MemStatus)
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m)):
+                return round(m.ullTotalPhys / 2**30, 1)
+            return None
+        return round(os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 2**30, 1)
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
+def _nvidia_gpus() -> list[dict]:
+    for fields in ("name,memory.total,compute_cap", "name,memory.total"):  # 오래된 드라이버는 compute_cap을 모른다
+        try:
+            r = subprocess.run(["nvidia-smi", f"--query-gpu={fields}", "--format=csv,noheader,nounits"],
+                               capture_output=True, text=True, timeout=15, encoding="utf-8", errors="replace")
+        except (OSError, subprocess.TimeoutExpired):
+            return []
+        if r.returncode != 0:
+            continue
+        gpus = []
+        for ln in r.stdout.strip().splitlines():
+            parts = [p.strip() for p in ln.split(",")]
+            try:
+                g = {"name": parts[0], "vram_gb": round(float(parts[1]) / 1024, 1)}
+            except (IndexError, ValueError):
+                continue
+            if len(parts) > 2 and re.fullmatch(r"\d+\.\d+", parts[2]):
+                g["compute_cap"] = parts[2]
+            gpus.append(g)
+        return gpus
+    return []
+
+
+def detect_hardware(lab: Path) -> dict:
+    gpus = _nvidia_gpus()
+    if gpus:
+        accel = "cuda"
+    elif sys.platform == "darwin" and platform.machine() == "arm64":
+        accel = "mps"
+    else:
+        accel = "cpu"
+    return {"detected": today(), "machine_id": _machine_id(), "os": f"{platform.system()} {platform.release()}",
+            "cpu_cores": os.cpu_count(), "ram_gb": _ram_gb(), "disk_free_gb": round(shutil.disk_usage(lab).free / 1e9),
+            "accelerator": accel, "gpus": gpus}
+
+
+def derive_limits(hw: dict, overrides: dict | None = None) -> dict:
+    """탐색한 하드웨어에서 운영 제약을 계산한다. 교수님이 overrides에 적은 값이 우선한다."""
+    accel, gpus, ram = hw.get("accelerator", "cpu"), hw.get("gpus") or [], hw.get("ram_gb")
+    lim: dict = {"device": accel}
+    if accel == "cuda":
+        caps = [float(g.get("compute_cap") or 0) for g in gpus]
+        lim["precision"] = "bf16" if min(caps) >= 8.0 else "fp16"
+        mem = min(g["vram_gb"] for g in gpus) * VRAM_HEADROOM
+        lim["vram_budget_gb"] = round(mem, 1)
+    elif accel == "mps":  # Apple 통합 메모리: RAM의 절반까지만 가속기 몫으로 본다
+        lim["precision"] = "fp32"
+        mem = (ram or 8) * 0.5
+    else:
+        lim["precision"] = "fp32"
+        mem = None
+    lim["max_train_params_m"] = (int(mem * 1e9 * ACTIVATION_SHARE / BYTES_PER_PARAM / 1e7) * 10
+                                 if mem else CPU_TRAIN_PARAMS_M)
+    lim["parallel_runs"] = max(1, len(gpus))
+    lim["dataloader_workers"] = 0 if hw.get("os", "").startswith("Windows") else min(8, (hw.get("cpu_cores") or 2) // 2)
+    if ram:
+        lim["ram_budget_gb"] = round(ram * 0.6, 1)
+    lim.update({k: v for k, v in (overrides or {}).items() if k in lim})
+    return lim
+
+
+def ensure_hardware(lab: Path, refresh: bool = False) -> tuple[dict, dict, bool]:
+    """처음이거나 PC가 바뀌었을 때(또는 refresh) 하드웨어를 탐색하고, 운영 제약을
+    lab.config.json → compute.limits에 건다. (하드웨어, 제약, 새로 탐색했는지)를 돌려준다."""
+    path = lab / CONFIG
+    cfg = load_json(path, None)
+    if not isinstance(cfg, dict):
+        return {}, {}, False
+    comp = cfg.setdefault("compute", {})
+    hw = comp.get("hardware") or {}
+    redetected = refresh or hw.get("machine_id") != _machine_id()
+    if redetected:
+        hw = detect_hardware(lab)
+    limits = derive_limits(hw, comp.get("overrides"))
+    if redetected or comp.get("limits") != limits:
+        comp["hardware"], comp["limits"] = hw, limits
+        with state_lock(lab):
+            save_json(path, cfg)
+    return hw, limits, redetected
+
+
+def limits_line(hw: dict, lim: dict) -> str:
+    gpus = hw.get("gpus") or []
+    if gpus:
+        head = " + ".join(f"{g['name']} {g['vram_gb']}GB" for g in gpus)
+    elif lim.get("device") == "mps":
+        head = f"Apple GPU (통합 메모리 {hw.get('ram_gb')}GB)"
+    else:
+        head = "GPU 없음 (CPU로 실행)"
+    parts = [f"{head}, {lim.get('precision')}"]
+    if lim.get("vram_budget_gb"):
+        parts.append(f"VRAM 예산 {lim['vram_budget_gb']}GB")
+    parts.append(f"처음부터 학습하는 모델 약 {lim.get('max_train_params_m')}M 파라미터 이하")
+    parts.append(f"동시 실행 {lim.get('parallel_runs')}")
+    parts.append(f"DataLoader workers {lim.get('dataloader_workers')}")
+    if lim.get("ram_budget_gb"):
+        parts.append(f"RAM 예산 {lim['ram_budget_gb']}GB")
+    return " · ".join(parts)
+
+
+def cmd_hardware(args) -> None:
+    lab = need_lab(args)
+    hw, lim, redetected = ensure_hardware(lab, refresh=args.refresh)
+    if not hw:
+        sys.exit("오류: lab.config.json을 읽지 못했습니다")
+    comp = load_json(lab / CONFIG, {}).get("compute", {})
+    print(f"# 하드웨어 ({hw.get('detected')} 탐색{', 방금 새로 탐색함' if redetected else ''})")
+    print(f"- OS {hw.get('os')} · CPU 코어 {hw.get('cpu_cores')} · RAM {hw.get('ram_gb')}GB · 디스크 여유 {hw.get('disk_free_gb')}GB")
+    for i, g in enumerate(hw.get("gpus") or []):
+        print(f"- GPU {i}: {g['name']} · {g['vram_gb']}GB · compute {g.get('compute_cap', '알 수 없음')}")
+    if not hw.get("gpus"):
+        print("- NVIDIA GPU 없음" + (" (Apple GPU 사용)" if lim.get("device") == "mps" else ""))
+    print("\n# 운영 제약 (lab.config.json → compute.limits, 연구원은 이 안에서 계획한다)")
+    print(f"- {limits_line(hw, lim)}")
+    if lim.get("vram_budget_gb"):
+        print("- labkit이 실행마다 VRAM 사용을 예산 안으로 묶고, 최대 사용량을 기록한다 (파일럿으로 실제 크기를 확인)")
+    over = comp.get("overrides") or {}
+    unknown = [k for k in over if k not in lim]
+    print(f"- 교수님이 정한 값(overrides): {json.dumps(over, ensure_ascii=False) if over else '없음'}")
+    if unknown:
+        print(f"경고: overrides의 {', '.join(unknown)}는 알 수 없는 키라서 무시했습니다")
+    print('\n제약을 바꾸려면 lab.config.json → compute.overrides에 같은 키로 적으세요. 예: {"vram_budget_gb": 5}. '
+          "PC를 바꾸면 다음 세션 시작 때 자동으로 다시 탐색합니다 (지금 다시: lab.py hardware --refresh).")
+
+
 def cmd_doctor(args) -> None:
     lab = find_lab(args.lab)
     checks: list[tuple[str, str, str]] = []
@@ -2042,6 +2212,10 @@ def cmd_doctor(args) -> None:
                 checks.append(("주의", "torch / CUDA", "확인 실패"))
     for lvl, name, detail in checks:
         print(f"[{lvl}] {name}: {detail}")
+    if lab:
+        hw, lim, _ = ensure_hardware(lab)
+        if lim:
+            print(f"[정보] 운영 제약 (lab.py hardware): {limits_line(hw, lim)}")
 
 
 def cmd_map(args) -> None:
@@ -2168,6 +2342,8 @@ def main() -> None:
     p = sub.add_parser("doctor", help="실험 환경 진단"); p.add_argument("--torch", action="store_true")
     p.set_defaults(fn=cmd_doctor)
     p = sub.add_parser("map", help="연구 지도(mermaid) 만들기"); p.set_defaults(fn=cmd_map)
+    p = sub.add_parser("hardware", aliases=["hw"], help="이 PC의 하드웨어 탐색과 운영 제약")
+    p.add_argument("--refresh", action="store_true", help="지금 다시 탐색"); p.set_defaults(fn=cmd_hardware)
 
     args = ap.parse_args()
     if getattr(args, "op", None) == "score" and not getattr(args, "file", None):

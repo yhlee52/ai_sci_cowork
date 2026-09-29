@@ -23,7 +23,8 @@ def collect_results(exp_dir: str | Path, exp_id: str, hypothesis: str, setup: di
         if str(m["condition"]).startswith("pilot"):
             continue  # 파일럿은 코드가 도는지 확인하는 용도이고, 증거가 아니다
         runs.append({"run_id": m["run_id"], "condition": m["condition"], "seed": m["seed"],
-                     "status": m["status"], "metrics": m.get("final", {}), "wall_min": m.get("wall_min")})
+                     "status": m["status"], "metrics": m.get("final", {}), "wall_min": m.get("wall_min"),
+                     "peak_vram_gb": m.get("peak_vram_gb")})
     ok = [r for r in runs if r["status"] == "complete"]
     values: dict[str, dict[str, list[float]]] = {}
     for r in ok:
@@ -57,6 +58,7 @@ def collect_results(exp_dir: str | Path, exp_id: str, hypothesis: str, setup: di
     res = {"exp_id": exp_id, "status": status, "hypothesis": hypothesis, "setup": setup or {},
            "runs": runs, "summary": summary, "baseline": baseline if comparisons else None,
            "comparisons": comparisons, "notes": notes,
-           "gpu_minutes": round(sum(r["wall_min"] or 0 for r in runs), 2)}
+           "gpu_minutes": round(sum(r["wall_min"] or 0 for r in runs), 2),
+           "peak_vram_gb": max((r["peak_vram_gb"] for r in runs if r["peak_vram_gb"] is not None), default=None)}
     (exp_dir / "results.json").write_text(json.dumps(res, indent=2, ensure_ascii=False), encoding="utf-8")
     return res

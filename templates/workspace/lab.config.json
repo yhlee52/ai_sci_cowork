@@ -12,7 +12,9 @@
       "max_parallel_agents": 1,
       "literature_sources": 5,
       "brainstorm_agents": 3,
-      "ideas_per_agent": 3
+      "ideas_per_agent": 3,
+      "campaign_batch": 4,
+      "pilot_tournament": false
     },
     "standard": {
       "meeting_rounds": 3,
@@ -21,7 +23,9 @@
       "max_parallel_agents": 2,
       "literature_sources": 8,
       "brainstorm_agents": 4,
-      "ideas_per_agent": 4
+      "ideas_per_agent": 4,
+      "campaign_batch": 5,
+      "pilot_tournament": true
     },
     "deep": {
       "meeting_rounds": 4,
@@ -30,8 +34,19 @@
       "max_parallel_agents": 3,
       "literature_sources": 15,
       "brainstorm_agents": 6,
-      "ideas_per_agent": 4
+      "ideas_per_agent": 4,
+      "campaign_batch": 6,
+      "pilot_tournament": true
     }
+  },
+  "campaign": {
+    "trial_minutes": 5,
+    "max_trials": 40,
+    "max_hours": 8,
+    "patience": 15,
+    "baseline_repeats": 3,
+    "confirm_seeds": 3,
+    "_설명": "자율 탐색 캠페인 기본값. 한 번의 시도는 7분 이하여야 한다 (명령 하나가 10분 안에 끝나야 함)."
   },
   "compute": {
     "device": "cuda",
@@ -39,5 +54,9 @@
     "max_run_minutes": 30,
     "smoke_test_first": true,
     "python_env": "uv (pyproject.toml in workspace root)"
+  },
+  "git": {
+    "auto_commit": true,
+    "_설명": "세션 정리(archive)와 캠페인 시작·종료 때 연구실 저장소에 로컬 커밋. push는 교수님이 요청할 때만."
   }
 }

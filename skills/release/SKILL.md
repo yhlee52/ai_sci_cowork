@@ -13,7 +13,7 @@ The lab runs outside the company. Only **.md files** can be brought inside, and 
 1. Resolve the ids in `$ARGUMENTS` with `lab.py context <id>`. Collect findings (F-), their experiments (EXP-), reports, reviews, datasets (DS-), methods (M-), and the code the experiments use (`src/`, imported `labkit` modules).
 2. Check before proposing:
    - Findings should be `accepted`. `provisional` or pilot-only results go in only if 교수님 explicitly agrees, and are marked **"미확정"** everywhere.
-   - `lab.py verify` PASS for each included experiment.
+   - `lab.py audit` PASS for each included experiment or campaign (for a campaign: confirmation on fresh seeds done).
    - Licenses of datasets, pretrained models and copied code (P-/DS-/M- entries): note whether **company use** is allowed. Unknown → flag it.
 3. Ask 교수님 and **wait**:
    - what goes in / what is left out, license flags, open caveats;
@@ -25,7 +25,7 @@ The lab runs outside the company. Only **.md files** can be brought inside, and 
 **`REL-xxx-<slug>.md` — the main document** (always). First lines `# REL-xxx: <title>` and `> status: released | tags | session | summary`. Sections:
 - `## 한 줄 요약`
 - `## 무엇을 주는가` — the method/finding in plain words, and when to use it
-- `## 근거` — F-/EXP- ids (for traceability), result tables copied exactly from results.json (condition × metric, mean±std, n), what the review concluded
+- `## 근거` — F-/EXP-/CMP- ids (for traceability), result tables copied exactly from results.json / confirm.json (condition × metric, mean±std, n, 기준선 대비 개선과 95% 신뢰구간), what the review concluded
 - `## 적용 범위와 한계` — `scope_limits`, untested conditions, what must NOT be claimed
 - `## 사용 방법` — step by step for someone inside the company: restore the code (if bundled), required packages with pinned versions, the command to run, expected output and runtime, hardware used here
 - `## 재현 정보` — git commit, seeds, configs (inline, short), environment
@@ -39,6 +39,8 @@ The lab runs outside the company. Only **.md files** can be brought inside, and 
 - **Round-trip test (mandatory):** `lab.py unpack-md <bundle> --out <temp dir>`, then in that temp dir `uv venv .rel-venv && uv pip install -r requirements.txt --python .rel-venv`, run the smallest command from `## 사용 방법`, confirm it works, then delete the temp dir.
 
 Never include: `kb/`, `meetings/`, `briefs/`, agent memory, API keys/tokens, `.env`, absolute personal paths, data files.
+
+Before recording: `lab.py audit --report <main .md> --sources <EXP/CMP ids>` must find no unknown numbers.
 
 ## 3. Record
 - Append to the current `meetings/session_NNN.md` under `## 릴리스`: REL id, included ids, whether code was bundled, 교수님's approval, caveats. The archivist files it.

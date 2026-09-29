@@ -10,3 +10,6 @@ data/
 wandb/
 .ipynb_checkpoints/
 .rel-venv/
+research/campaigns/*/work/
+research/campaigns/*/scratch/
+research/campaigns/*/**/out.json

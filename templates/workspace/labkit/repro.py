@@ -26,6 +26,20 @@ def seed_everything(seed: int, deterministic: bool = False) -> None:
         pass
 
 
+def seed_from_env(default: int = 0) -> int:
+    """캠페인 실행기(lab.py campaign)가 넘겨 주는 시드(LAB_SEED). 없으면 default."""
+    try:
+        return int(os.environ.get("LAB_SEED", default))
+    except ValueError:
+        return default
+
+
+def report_metric(name: str, value: float) -> None:
+    """캠페인 실행기가 읽는 지표 줄을 출력한다: `LAB_METRIC 이름=값`.
+    평가 코드(가능하면 수정 금지 파일)에서 부른다. 값을 지어내거나 고치지 않는다."""
+    print(f"LAB_METRIC {name}={float(value):.10g}", flush=True)
+
+
 def get_device(prefer: str = "cuda"):
     try:
         import torch

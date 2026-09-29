@@ -6,7 +6,7 @@ argument-hint: "[action ids | all]"
 
 # Work session — execute action items
 
-Tool: `python "${CLAUDE_PLUGIN_ROOT}/scripts/lab.py"` (`action`, `inbox`, `next`, `find|context`, `verify`, `index`).
+Tool: `python "${CLAUDE_PLUGIN_ROOT}/scripts/lab.py"` (`action`, `inbox`, `next`, `find|context`, `audit`, `doctor`, `index`).
 
 ## 1. Select
 - `lab.py action list`. Take the ids in `$ARGUMENTS`, or all open items not owned by `professor`.
@@ -19,6 +19,7 @@ Context via `kb/digest.md`, `lab.py find` / `context <id>` — not by opening di
 ```
 # TASK-xxx → <agent> → <output id>   (할 일 A-xxx, 세션 NNN, 실험이면 단계 pilot|full)
 ## 목적의 사슬      MS-n → Q-xxx → H-xxx → EXP-xxx   (이 일이 왜 중요한가)
+## 단계            (실험이면) 재현 / 공정한 기준선 / 파일럿 / 본 실험 / 절제 / 조건 이동 점검
 ## 목표            "완료"의 의미, 1~2문장
 ## 맥락            필요한 사실만, ID로 인용 (D-, H-, F-, P-, DS-, M-, L-). 관련 교훈(L-) 포함
 ## 읽을 것         정확한 ID/경로 (agent는 `lab.py show`로 펼쳐 읽는다)
@@ -31,16 +32,19 @@ Context via `kb/digest.md`, `lab.py find` / `context <id>` — not by opening di
 - Owners → subagents: `scout` → `ai-lab:scout`, `engineer` → `ai-lab:engineer`, `critic` → `ai-lab:critic`, `writer` → `ai-lab:writer`. Owner `lead` → do it yourself.
 - Prompt: brief path, output id, session number, stage, `lab.py: python "${CLAUDE_PLUGIN_ROOT}/scripts/lab.py"`, "Follow your agent instructions." Nothing else.
 - **Experiment gates**
-  - Pilot: autonomous. After it, the plan (with pilot numbers, labelled as pilot) goes to 교수님 for full-run approval.
+  - First experiment in this lab: the engineer runs `lab.py doctor` first.
+  - Pilot: autonomous. After it, the plan (with pilot numbers, labelled as pilot) goes to 교수님 for full-run approval — or, if the next step is a search over one metric, to `/ai-lab:campaign plan`.
   - Full run: only if plan.md status is `approved`. Otherwise ask 교수님 now (see §4).
-  - After a full run: `lab.py verify` must PASS → writer report → critic review. With `review_passes` ≥ 2, run that many critics **in parallel** with different focus (methods/statistics vs. claims/scope) and merge their verdicts.
+  - After a full run: `lab.py audit` must PASS → writer report (audit again: no unknown numbers) → critic review. With `review_passes` ≥ 2, run that many critics **in parallel** with different focus (methods/statistics vs. claims/scope) and merge their verdicts.
+  - A mechanism claim needs a regime-shift check (or a scope limited to the tested setting) before it can become a finding — add it as an action when the critic asks for it.
   - A `major`/`reject` verdict → no automatic rerun; it goes to the next `review` meeting.
 
 ## 4. Decisions raised during work
 When a subagent returns `NEEDS DECISION:` (or you hit a class-C matter):
-- If 교수님 is in the conversation, ask right away: the question, options with trade-offs, the critic/engineer view if relevant, and your recommendation. **Wait** for the answer, record it (minutes `결정 사항`, plan status if an approval), then continue.
+- If 교수님 is in the conversation, ask right away with the **AskUserQuestion** tool: the question, options with one-line trade-offs (your recommendation first), the critic/engineer view if relevant. **Wait** for the answer, record it (minutes `답과 결정`, plan status if an approval), then continue.
 - If 교수님 defers, `lab.py inbox add --from <agent> --question "..." --options "..." --ref <id>` and continue only with independent items.
 - Class B: get a peer view (usually a short critic call) before proceeding, and log it.
+- Honest failure is a valid result: if an agent reports that something is infeasible or failed, record it as such — never ask it to "make it work somehow" with substitute data.
 
 ## 5. Log (after each return)
 - `lab.py action done A-xxx --result "<one line>"`; add follow-ups with `lab.py action add`.

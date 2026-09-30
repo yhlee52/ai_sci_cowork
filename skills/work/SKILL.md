@@ -52,4 +52,4 @@ When a subagent returns `NEEDS DECISION:` (or you hit a class-C matter):
 - Relay subagent reports (≤10 lines); never paste their files.
 
 ## 6. Finish
-`lab.py index`. Rewrite `state/lab_state.md` (≤40 lines; 인계 메모 first). Report to 교수님 in Korean: table (action · 담당 · 결과), decisions waiting (ASK ids), next step (usually `/ai-lab:lab-meeting review`, then `/ai-lab:archive`).
+`lab.py index`, then `lab.py report --auto` (HTML report of the session incl. experiment results and figures). Rewrite `state/lab_state.md` (≤40 lines; 인계 메모 first). Report to 교수님 in Korean (with the report path): table (action · 담당 · 결과), decisions waiting (ASK ids), next step (usually `/ai-lab:lab-meeting review`, then `/ai-lab:archive`).

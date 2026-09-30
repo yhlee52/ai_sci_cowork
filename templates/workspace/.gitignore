@@ -14,4 +14,5 @@ research/campaigns/*/work/
 research/campaigns/*/scratch/
 research/campaigns/*/**/out.json
 state/.lock
+reports/
 .*.tmp

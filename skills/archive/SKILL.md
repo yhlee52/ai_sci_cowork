@@ -16,4 +16,5 @@ Like a shift handover: the next session starts with no memory, so everything it 
 5. Add one line under `state/cycle.md` `## 진행`: `session NNN — <what advanced>`. If `lab.py status` shows the cycle is due (`→ 회고할 때입니다`), tell 교수님 the next meeting should be `/ai-lab:lab-meeting retro`.
 6. `lab.py lint` — anything 실패 must be fixed now (or reported to 교수님 if it needs a decision).
 7. If `lab.config.json → git.auto_commit` is true: `git add -A` then `git commit -m "세션 NNN 정리: <세션 제목>"` (local only; push only when 교수님 asks). Large artifacts are already excluded by `.gitignore`.
-8. Relay the archivist's report (≤8 lines), the lint summary, the commit id, and any open ASK items.
+8. `lab.py report session NNN --auto` — the HTML report now includes the archivist's summary, recorded decisions and findings.
+9. Relay the archivist's report (≤8 lines), the lint summary, the commit id, the report path, and any open ASK items.

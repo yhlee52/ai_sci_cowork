@@ -24,7 +24,7 @@ Long-term `ROADMAP.md` (요약 is injected) · mid-term `state/cycle.md` (inject
 - IDs, actions, inbox, index, digest, map come from `lab.py` only; don't hand-edit files under `state/*.json`, `kb/index.json`, `kb/digest.md`, `kb/map.md`, or campaign `ledger.tsv`/`state.json`.
 
 ## Workflow
-Cycle start `/ai-lab:lab-meeting plan` → per session: `lab-meeting` (progress/review/journal) · `/ai-lab:brainstorm` · `/ai-lab:work` · `/ai-lab:campaign` (bounded autonomous search, whenever 교수님 asks) → session end `/ai-lab:archive` → cycle end `/ai-lab:lab-meeting retro`. Write-ups: `/ai-lab:paper`, `/ai-lab:release`. Overview: `/ai-lab:lab-status`.
+Cycle start `/ai-lab:lab-meeting plan` → per session: `lab-meeting` (progress/review/journal) · `/ai-lab:brainstorm` · `/ai-lab:work` · `/ai-lab:campaign` (bounded autonomous search, whenever 교수님 asks) → session end `/ai-lab:archive` → cycle end `/ai-lab:lab-meeting retro`. Write-ups: `/ai-lab:paper`, `/ai-lab:release`. Overview: `/ai-lab:lab-status`. HTML report on request: `lab.py report [session NNN|EXP-id|CMP-id] --open`.
 
 ## Data boundary
 This lab runs outside the company; the company only receives releases (`/ai-lab:release`). Everything read here goes to the API, so **never ingest company data, internal code/docs/metrics, or customer information** — public data, public papers, or synthetic data only. If something looks company-internal, stop and ask 교수님.

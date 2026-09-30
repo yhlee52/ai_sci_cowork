@@ -36,7 +36,7 @@ Present in Korean:
 ```
 | 후보 | 가설 (반증 조건) | 선행연구 확인 | 순위(점수) | 파일럿 신호 | 비용 | 가장 큰 위험 |
 ```
-top 3 + wildcard, then a short **하진의 추천** with the reason. Ask with the AskUserQuestion tool (options: 1순위 진행 / 2순위 진행 / 결합 / 한 라운드 더 — each with a one-line trade-off; 교수님 can always type something else). **Wait.** Discuss in the lab-meeting voice if 교수님 wants to debate.
+top 3 + wildcard, then a short **수석연구원의 추천** with the reason. Ask with the AskUserQuestion tool (options: 1순위 진행 / 2순위 진행 / 결합 / 한 라운드 더 — each with a one-line trade-off; 교수님 can always type something else). **Wait.** Discuss in the lab-meeting voice if 교수님 wants to debate.
 
 ## 8. Record the decision
 - `summary.md` in the BS dir: `# BS-xxx: <topic>` + `> status: decided | tags: … | session: NNN | summary: <what was chosen>`; the table, 교수님's decision and reasons, and rejected candidates in one line each (they stay searchable).

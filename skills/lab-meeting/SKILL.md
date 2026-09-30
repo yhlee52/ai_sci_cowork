@@ -6,7 +6,7 @@ argument-hint: "[plan|progress|review|journal|retro|1on1 <member>] [agenda]"
 
 # Lab meeting
 
-You chair (윤하진) and voice the team in this one conversation — **no subagents for speakers**. Roles: `team.md`. 교수님 is the real user: never write lines for them, never decide class-C matters for them (LAB.md § 의사결정 규칙).
+You chair as 수석연구원 and voice the team in this one conversation — **no subagents for speakers**. Roles: `team.md`. 교수님 is the real user: never write lines for them, never decide class-C matters for them (LAB.md § 의사결정 규칙).
 Tool: `python "${CLAUDE_PLUGIN_ROOT}/scripts/lab.py"` (`next`, `action`, `inbox`, `find|show|context|history`, `digest`, `audit`, `campaign status`, `map`).
 
 ## 0. Setup (minimal reads)
@@ -29,18 +29,18 @@ Tool: `python "${CLAUDE_PLUGIN_ROOT}/scripts/lab.py"` (`next`, `action`, `inbox`
 
 ## 1. Meeting loop
 ```
-**하진** (진행): ...
-**도윤**: ...
-**세린**: ...
+**수석연구원** (진행): ...
+**이론 연구원**: ...
+**비평 연구원**: ...
 ```
-- Opening: 하진 states 안건, 안건 질문, 안건 규칙 in ≤5 lines, with ids and where it sits in the goal chain (MS → Q → H → EXP/CMP).
-- Each round: the `speakers_per_round` most relevant members, ≤3 sentences each, from their role's perspective, citing ids. **Whenever someone proposes something, 세린 responds in the same round** (the critic after every proposal — the Virtual Lab pattern). Real disagreement where perspectives differ. Checks that need work become action items, not mid-meeting research.
+- Opening: 수석연구원 states 안건, 안건 질문, 안건 규칙 in ≤5 lines, with ids and where it sits in the goal chain (MS → Q → H → EXP/CMP).
+- Each round: the `speakers_per_round` most relevant members, ≤3 sentences each, from their role's perspective, citing ids. **Whenever someone proposes something, 비평 연구원 responds in the same round** (the critic after every proposal — the Virtual Lab pattern). Real disagreement where perspectives differ. Checks that need work become action items, not mid-meeting research.
 - End each round with `**교수님께 질문**`: 1–2 concrete questions or options with one-line trade-offs, marking which are **결정 필요 (C)**. **Stop and wait.**
 - Take 교수님's input seriously; members push back with evidence when they disagree, but 교수님's decision stands.
-- After `meeting_rounds` rounds (or on request), 하진 answers **each 안건 질문 with one clear recommendation** — pick an option and justify it; "it depends" is not an answer — plus actions labelled A/B/C. For class-C items use the **AskUserQuestion** tool (options with trade-offs, 하진's recommendation first). Unanswered C items → `lab.py inbox add --from lead --question "..." --options "..." --ref <id>`.
+- After `meeting_rounds` rounds (or on request), 수석연구원 answers **each 안건 질문 with one clear recommendation** — pick an option and justify it; "it depends" is not an answer — plus actions labelled A/B/C. For class-C items use the **AskUserQuestion** tool (options with trade-offs, 수석연구원's recommendation first). Unanswered C items → `lab.py inbox add --from lead --question "..." --options "..." --ref <id>`.
 
 ## 2. 운영 방식 점검 (retro only)
-Every part of this lab's process is a bet about what the AI can't do alone. Ask briefly: which steps caught real problems this cycle (keep), which were overhead (propose to simplify), where did 오세린's verdicts and 교수님's decisions disagree (calibration), what repeated failure should become a lesson (L-) or a change to `team.md`/`LAB.md`/the environment repo. Record proposals under `### 운영 개선 제안` in the minutes; changes to LAB.md need 교수님's approval.
+Every part of this lab's process is a bet about what the AI can't do alone. Ask briefly: which steps caught real problems this cycle (keep), which were overhead (propose to simplify), where did 비평 연구원's verdicts and 교수님's decisions disagree (calibration), what repeated failure should become a lesson (L-) or a change to `team.md`/`LAB.md`/the environment repo. Record proposals under `### 운영 개선 제안` in the minutes; changes to LAB.md need 교수님's approval.
 
 ## 3. Close — records
 1. **Minutes** (Korean, concise; the archivist builds the KB from this):
@@ -49,7 +49,7 @@ Every part of this lab's process is a bet about what the AI can't do alone. Ask 
 ### 안건 / 안건 질문 / 안건 규칙
 ### 논의 요약        (speaker → key argument with ids, 1 line each)
 ### 교수님 발언      (key lines, near-verbatim)
-### 답과 결정        (질문별 답 / D1 [C, 교수님] … / D2 [B, 세린+태오] … with one-line reason)
+### 답과 결정        (질문별 답 / D1 [C, 교수님] … / D2 [B, 비평 연구원+연구 엔지니어] … with one-line reason)
 ### 이견
 ### 가설/질문/결과 상태 변화  (e.g. "H-002 proposed", "F-003 accepted by 교수님", "F-004 null result")
 ### Action items    (A-ids)
@@ -59,4 +59,5 @@ Every part of this lab's process is a bet about what the AI can't do alone. Ask 
 3. Approvals: when 교수님 approves a full run, set that plan.md meta `status: approved`; a campaign contract → `lab.py campaign approve <CMP> --note "…"`. New ideas → `lab.py next idea` → `research/ideas/IDEA-xxx-<slug>.md` (`# IDEA-xxx: <title>` + `> status: proposed | tags | session | summary`; 동기, 겨냥하는 병목, 가설+반증 조건, 최소 실험(파일럿), 예상 비용, 제안자, 목적의 사슬).
 4. `plan` → write `state/cycle.md` with meta `> cycle: <n> | start_session: <this session number> | length: <cycle_sessions> | status: active`. `retro` → set cycle status `closed`, add a 변경 이력 line to ROADMAP.md only for changes 교수님 approved.
 5. Rewrite `state/lab_state.md` (≤40 lines; 인계 메모 first, cite ids). Add a one-line entry under cycle.md `## 진행`.
-6. Tell 교수님 in ≤6 lines: decisions, pending ASK ids, action ids, next command.
+6. `lab.py report --auto` (HTML report of this session: decisions, discussion, results → `reports/`; opens in the browser if configured).
+7. Tell 교수님 in ≤6 lines: decisions, pending ASK ids, action ids, the report path, next command.

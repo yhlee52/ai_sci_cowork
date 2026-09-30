@@ -33,8 +33,8 @@ Wrap-up (still unattended):
 1. `lab.py campaign confirm <CMP>` repeatedly until it prints 완료 (fresh seeds, baseline vs best, CI).
 2. `ai-lab:writer` → `summary.md`; `ai-lab:critic` → a REV on the campaign (kept patches, confirmation, gaming check); `lab.py audit <CMP>` must pass.
 3. `lab.py inbox add --from lead --question "<CMP> 결과를 결과(F-)로 확정할까요? <한 줄 요약>" --options "확정|잠정으로 두기|추가 확인 실험|기각" --ref <CMP>`.
-4. Rewrite `state/lab_state.md` (인계 메모: what ran, the verdict, the ASK id); local git commit `캠페인 <CMP> 종료` if auto_commit.
-5. Final message (≤10 lines, Korean): trials run, best vs baseline, confirmation verdict with CI, review verdict, the ASK id, and what 교수님 should look at first.
+4. `lab.py report <CMP> --auto` (HTML report: progress chart, kept trials, confirmation). Rewrite `state/lab_state.md` (인계 메모: what ran, the verdict, the ASK id); local git commit `캠페인 <CMP> 종료` if auto_commit.
+5. Final message (≤10 lines, Korean): trials run, best vs baseline, confirmation verdict with CI, review verdict, the ASK id, the report path, and what 교수님 should look at first.
 
 ## status <CMP-id> / stop <CMP-id>
 `lab.py campaign status <CMP>` (or `stop <CMP> --reason "교수님 요청"`) and explain in ≤8 Korean lines. After 교수님 decides on the result, `lab.py campaign close <CMP> --note "<결정>"`.

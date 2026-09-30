@@ -238,6 +238,71 @@ class TestHardware(unittest.TestCase):
         self.assertEqual((lim["precision"], lim["max_train_params_m"]), ("fp32", 3))
 
 
+class TestReport(unittest.TestCase):
+    """HTML 리포트: 회의록의 결정, 지식베이스 항목, 실험 결과가 파일에서 그대로 모인다."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp.name)
+        self.lab = make_lab(self.tmp)
+        lab(self.lab, "next", "session")
+        (self.lab / "meetings" / "session_001.md").write_text(
+            "# Session 001\n\n## 회의 1 (plan): 첫 질문\n### 논의 요약\n- 이론 연구원 → H-001 제안\n"
+            "### 답과 결정\n- D1 [C, 교수님] 조건은 두 개로 한다\n\n## 작업 로그\n- A-001 · 연구 엔지니어 · EXP-001 · 완료\n",
+            encoding="utf-8")
+        exp = self.lab / "research/experiments/EXP-001-ls"
+        exp.mkdir(parents=True)
+        (exp / "plan.md").write_text("# EXP-001: 비교\n> status: approved | session: 001 | metric: ece | goal: min\n", encoding="utf-8")
+        summary = {"baseline": {"ece": {"mean": 0.0612, "std": 0.002, "n": 3}}, "ls01": {"ece": {"mean": 0.0317, "std": 0.002, "n": 3}}}
+        comp = {"ls01": {"ece": {"improvement": 0.0295, "ci_low": 0.027, "ci_high": 0.032, "verdict": "개선 (95% 신뢰구간이 0보다 큼)"}}}
+        (exp / "results.json").write_text(json.dumps({"exp_id": "EXP-001", "status": "complete", "hypothesis": "ECE가 줄어든다",
+                                                      "runs": [], "summary": summary, "comparisons": comp, "gpu_minutes": 3.5},
+                                                     ensure_ascii=False), encoding="utf-8")
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def assert_valid_html(self, text: str) -> None:
+        from html.parser import HTMLParser
+        void = {"meta", "br", "img", "hr", "circle", "line", "rect", "polyline", "polygon"}
+        stack = []
+
+        class P(HTMLParser):
+            def handle_starttag(self, tag, attrs):
+                if tag not in void:
+                    stack.append(tag)
+
+            def handle_endtag(self, tag):
+                if tag not in void:
+                    self_ok = stack and stack[-1] == tag
+                    if not self_ok:
+                        raise AssertionError(f"닫는 태그 불일치: {tag} (열린 태그 {stack[-3:]})")
+                    stack.pop()
+        P().feed(text)
+        self.assertEqual(stack, [])
+
+    def test_session_and_experiment_reports(self):
+        out = lab(self.lab, "report").stdout
+        self.assertIn("session_001.html", out)
+        html_text = (self.lab / "reports" / "session_001.html").read_text(encoding="utf-8")
+        self.assert_valid_html(html_text)
+        for s in ("결정된 사항", "조건은 두 개로 한다", "주요 논의", "작업 기록", "실험 결과", "0.0612", "개선 (95% 신뢰구간이 0보다 큼)"):
+            self.assertIn(s, html_text)
+        lab(self.lab, "report", "EXP-001")
+        exp_html = (self.lab / "reports" / "EXP-001.html").read_text(encoding="utf-8")
+        self.assert_valid_html(exp_html)
+        self.assertIn("<svg", exp_html)
+        self.assertNotEqual(lab(self.lab, "report", "EXP-999", check=False).returncode, 0)
+
+    def test_auto_respects_config(self):
+        cfg_path = self.lab / "lab.config.json"
+        cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+        cfg["report"]["after_activities"] = False
+        cfg_path.write_text(json.dumps(cfg, ensure_ascii=False), encoding="utf-8")
+        self.assertEqual(lab(self.lab, "report", "--auto").stdout.strip(), "")
+        self.assertFalse((self.lab / "reports").exists())
+
+
 class TestCampaign(unittest.TestCase):
     """제안은 AI, 판정은 코드: 채택/기각/규칙 위반/실패/가짜 지표/멈춤/확인 실험/장부 위조 탐지."""
 
@@ -307,6 +372,10 @@ class TestCampaign(unittest.TestCase):
         self.assertIn("규칙 재계산", r.stdout)
         ledger.write_text(original, encoding="utf-8")
 
+        lab(self.lab, "report", "CMP-001")
+        cmp_html = (self.lab / "reports" / "CMP-001.html").read_text(encoding="utf-8")
+        self.assertIn("확인 실험", cmp_html)
+        self.assertIn("<svg", cmp_html)
         self.assertIn("CMP-001", lab(self.lab, "status", "--hook").stdout)
         lab(self.lab, "campaign", "close", "CMP-001", "--note", "리뷰 완료")
         self.assertNotIn("CMP-001 [", lab(self.lab, "status", "--hook").stdout)

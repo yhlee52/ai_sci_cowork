@@ -25,6 +25,7 @@ agent가 필요한 것만 읽도록 돕는다. 모든 출력은 한글이다.
   lab.py lint                           지식베이스 무결성 점검
   lab.py doctor [--torch]               실험 환경 진단
   lab.py map                            연구 지도(mermaid) 만들기 → kb/map.md
+  lab.py report [세션|EXP-id|CMP-id] [--open]  결정·결과·실험을 모은 HTML 리포트 → reports/
   lab.py hardware [--refresh]           이 PC의 하드웨어 탐색 → 운영 제약(compute.limits) 자동 설정
 
 연구실 루트 = 현재 폴더에서 위로 올라가며 lab.config.json이 있는 첫 폴더
@@ -479,7 +480,7 @@ def cmd_status(args) -> None:
                  for t, c in sorted(counts.items())]
         out.append("\n## 지식베이스\n- " + "; ".join(parts))
     if args.hook:
-        out.append(f'\n연구실 도구 (필요한 것만 읽기): python "{SELF}" find|show|context|history|digest|audit|inbox|campaign|lit ...')
+        out.append(f'\n연구실 도구 (필요한 것만 읽기): python "{SELF}" find|show|context|history|digest|audit|inbox|campaign|lit|report ...')
     print("\n".join(out))
 
 
@@ -2018,6 +2019,307 @@ def cmd_lint(args) -> None:
     print(f"점검 결과: 실패 {fails}건, 경고 {sum(1 for l, _ in issues if l == '경고')}건, 정보 {sum(1 for l, _ in issues if l == '정보')}건")
 
 
+# ---------------------------------------------------------------- HTML 리포트 (세션·실험·캠페인)
+
+def _report_mod():
+    if str(SELF.parent) not in sys.path:
+        sys.path.insert(0, str(SELF.parent))
+    import report_html
+    return report_html
+
+
+def _audit_verdict(lab: Path, eid: str) -> str:
+    try:
+        if eid.startswith("CMP-"):
+            d = campaign_dir(lab, eid)
+            issues = campaign_verify(lab, d) + report_number_check(d)
+        else:
+            d = exp_dir(lab, eid)
+            if d is None:
+                return "확인 불가"
+            issues = verify_experiment(d) + spec_check(d) + report_number_check(d)
+    except (SystemExit, OSError, ValueError, KeyError):
+        return "확인 불가"
+    fails = sum(1 for lvl, _ in issues if lvl == "실패")
+    return f"실패 {fails}건" if fails else "통과"
+
+
+def _figures(R, d: Path, limit: int) -> str:
+    out = []
+    figs = [f for f in sorted((d / "figures").glob("*")) if f.suffix.lower() in (".png", ".svg", ".jpg", ".jpeg")]
+    for f in figs[:limit]:
+        if f.stat().st_size > 3_000_000:
+            out.append(f'<p class="empty">{R.esc(f.name)}: 3MB가 넘어 넣지 않았습니다 ({R.esc(rel(d.parent.parent.parent, f))})</p>')
+        else:
+            out.append(R.img_tag(f.read_bytes(), f.name))
+    if len(figs) > limit:
+        out.append(f'<p class="muted">그림 {len(figs) - limit}개 더 있음: {R.esc(rel(d.parent.parent.parent, d / "figures"))}</p>')
+    return "".join(out)
+
+
+def _md_details(R, path: Path, label: str, open_: bool = False) -> str:
+    if not path.exists():
+        return ""
+    return (f'<details{" open" if open_ else ""}><summary>{R.esc(label)}</summary>'
+            f"{R.md_to_html(path.read_text(encoding='utf-8'))}</details>")
+
+
+def _exp_block(lab: Path, R, eid: str, full: bool) -> str:
+    d = exp_dir(lab, eid)
+    if d is None:
+        return ""
+    m, meta = md_meta(d / "plan.md"), md_meta_raw(d / "plan.md")
+    res = load_json(d / "results.json", {})
+    chips = [f"계획 {ko_status(m.get('status', '')) or '-'}"]
+    if res:
+        chips.append(f"결과 {ko_status(res.get('status', ''))}")
+        chips.append(f"GPU {res.get('gpu_minutes', 0)}분")
+        if res.get("peak_vram_gb") is not None:
+            chips.append(f"최대 VRAM {res['peak_vram_gb']}GB")
+    parts = [f'<h3><span class="id">{eid}</span> {R.esc(m.get("title") or d.name)}</h3><div>'
+             + "".join(f'<span class="chip">{R.esc(c)}</span>' for c in chips)
+             + (R.audit_badge(_audit_verdict(lab, eid)) if res else "") + "</div>"]
+    if res.get("hypothesis") or m.get("summary"):
+        parts.append(f'<p class="muted">{R.inline(res.get("hypothesis") or m.get("summary"))}</p>')
+    summ = res.get("summary") or {}
+    if summ:
+        metrics = sorted({k for c in summ.values() for k in c})
+        rows = [[cond] + [f"{R.fmt(v[k]['mean'])} ± {R.fmt(v[k]['std'], 2)} (n={v[k]['n']})" if k in v else "-" for k in metrics]
+                for cond, v in summ.items()]
+        parts.append(R.table_html(["조건"] + metrics, rows, num_cols=tuple(range(1, len(metrics) + 1))))
+        main = meta.get("metric") if meta.get("metric") in metrics else metrics[0]
+        parts.append(R.svg_bars(summ, main))
+    comps = res.get("comparisons") or {}
+    if comps:
+        rows = []
+        for cond, mm in comps.items():
+            for k, c in mm.items():
+                rows.append([R.esc(cond), R.esc(k), R.esc(f"{c['improvement']:+.4g}"),
+                             R.esc(f"[{c['ci_low']:+.4g}, {c['ci_high']:+.4g}]"), R.badge(c.get("verdict", ""))])
+        parts.append("<h4>기준선 대비 (코드가 계산한 부트스트랩 95% 신뢰구간)</h4>")
+        parts.append(R.table_html(["조건", "지표", "개선량", "95% 신뢰구간", "판정"], rows, raw=True, num_cols=(2, 3)))
+    if res.get("notes"):
+        parts.append(f'<p class="muted">{R.inline(res["notes"])}</p>')
+    if not res:
+        parts.append('<p class="empty">아직 results.json이 없습니다 (본 실험 전이거나 진행 중).</p>')
+    parts.append(_figures(R, d, 12 if full else 2))
+    parts.append(_md_details(R, d / "report.md", "보고서 (report.md)", open_=full))
+    if full:
+        parts.append(_md_details(R, d / "plan.md", "실험 계획과 사전 등록 (plan.md)"))
+    return "".join(parts)
+
+
+def _cmp_block(lab: Path, R, cid: str, full: bool) -> str:
+    hits = [p for p in (lab / "research" / "campaigns").glob(f"{cid}*") if p.is_dir()]
+    if not hits:
+        return ""
+    d = hits[0]
+    cfg, st = load_json(d / "campaign.json", {}), load_json(d / "state.json", {})
+    if not cfg:
+        return ""
+    meta = md_meta_raw(d / "campaign.md")
+    rows = [r for r in _ledger_rows(d) if r["trial"].startswith("T-")]
+    counts: dict[str, int] = {}
+    for r in rows:
+        counts[r["status"]] = counts.get(r["status"], 0) + 1
+    parts = [f'<h3><span class="id">{cid}</span> {R.esc(cfg.get("title", ""))}</h3><div>'
+             f'<span class="chip">{R.esc(ko_status(meta.get("status", "")))}</span>'
+             f'<span class="chip">지표 {R.esc(cfg.get("metric"))} ({"낮을수록" if cfg.get("goal") == "min" else "높을수록"} 좋음)</span>'
+             + (R.audit_badge(_audit_verdict(lab, cid)) if rows else "") + "</div>"]
+    stats = [("시도", f"{st.get('n_trials', 0)}/{cfg.get('max_trials')}")]
+    if st.get("baseline_done"):
+        gain = _improvement(cfg["goal"], st["best_metric"], st["baseline_metric"])
+        stats += [("기준선", _fmt(st["baseline_metric"])), (f"최고 ({st.get('best_trial')})", _fmt(st["best_metric"])),
+                  ("개선량", f"{gain:+.4g}"), ("채택 문턱 δ", _fmt(st.get("delta")))]
+    stats.append(("채택", str(counts.get("keep", 0) + counts.get("keep-simpler", 0))))
+    parts.append(R.stats_grid(stats))
+    c = (st.get("confirm") or {}).get("result")
+    if c:
+        parts.append(f'<p>새 시드 확인 실험: {R.badge(c["verdict"])} 개선 {c["improvement"]:+.4g}, '
+                     f'95% 신뢰구간 [{c["ci_low"]:+.4g}, {c["ci_high"]:+.4g}]</p>')
+    elif st.get("stopped"):
+        parts.append(f'<p class="muted">멈춘 이유: {R.esc(st["stopped"])} · 확인 실험 전</p>')
+    if rows:
+        parts.append(R.svg_campaign(rows, st.get("baseline_metric"), cfg.get("goal", "max"), cfg.get("metric", "")))
+        shown = rows if full else [r for r in rows if r["status"] in ("keep", "keep-simpler")]
+        if shown:
+            parts.append("<h4>" + ("모든 시도" if full else "채택된 시도") + "</h4>")
+            parts.append(R.table_html(["시도", "지표", "개선량", "판정", "변경 줄", "설명"],
+                                      [[r["trial"], _fmt_cell(r["metric"]), _fmt_cell(r["improvement"], sign=True), ko_status(r["status"]),
+                                        r["lines"], r["description"]] for r in shown], num_cols=(1, 2)))
+    parts.append(_md_details(R, d / "summary.md", "요약 보고서 (summary.md)", open_=full))
+    if full:
+        parts.append(_md_details(R, d / "campaign.md", "승인된 탐색 계약 (campaign.md)"))
+        parts.append(_md_details(R, d / "notes.md", "탐색 노트 (notes.md)"))
+    return "".join(parts)
+
+
+def _fmt_cell(v: str, sign: bool = False) -> str:
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return v or "-"
+    return f"{x:+.4g}" if sign else f"{x:.6g}"
+
+
+def _minutes_blocks(text: str) -> list[tuple[str, dict[str, str]]]:
+    """회의록을 (## 제목, {### 소제목: 본문}) 목록으로 나눈다. 소제목 앞의 본문은 키 ""에 둔다."""
+    blocks: list[tuple[str, dict[str, str]]] = []
+    cur, sub, buf = None, "", []
+    for ln in text.splitlines() + ["## "]:
+        if ln.startswith("## ") or ln.startswith("### "):
+            if cur is not None:
+                cur[1][sub] = "\n".join(buf).strip()
+            buf = []
+            if ln.startswith("## "):
+                cur = (ln[3:].strip(), {})
+                blocks.append(cur)
+                sub = ""
+            else:
+                sub = ln[4:].strip()
+            continue
+        buf.append(ln)
+    return [b for b in blocks if b[0]]
+
+
+def _kb_entries(lab: Path, kind: str, session: str) -> list[dict]:
+    out = []
+    for f in sorted((lab / KB_DIRS[kind]).glob("*.json")):
+        e = load_json(f, {})
+        if session in (e.get("created_session"), e.get("updated_session")):
+            out.append(e)
+    return out
+
+
+def _session_report(lab: Path, R, num: str) -> tuple[str, str]:
+    mfile = lab / "meetings" / f"session_{num}.md"
+    minutes = mfile.read_text(encoding="utf-8") if mfile.exists() else ""
+    log = load_json(lab / "kb" / "log" / f"session_{num}.json", {})
+    if not minutes and not log:
+        sys.exit(f"오류: 세션 {num}의 회의록도 세션 로그도 없습니다")
+    blocks = _minutes_blocks(minutes)
+    ids = set(ID_RE.findall(minutes + json.dumps(log, ensure_ascii=False)))
+    exps = sorted({i for i in ids if i.startswith("EXP-")} |
+                  {ID_RE.match(p.name).group(0) for p in (lab / "research" / "experiments").glob("EXP-*")
+                   if p.is_dir() and md_meta(p / "plan.md").get("session") == num})
+    cmps = sorted(i for i in ids if i.startswith("CMP-"))
+    decisions, findings = _kb_entries(lab, "decision", num), _kb_entries(lab, "finding", num)
+    actions = [a for a in load_json(lab / "state" / "actions.json", []) if str(a.get("session", "")).zfill(3) == num]
+    asks = [q for q in load_json(lab / "state" / "inbox.json", []) if q.get("status") == "open"]
+    meetings = [b for b in blocks if b[0].startswith("회의")]
+
+    def subs(prefixes: tuple[str, ...]) -> list[tuple[str, str, str]]:
+        return [(title, k, v) for title, secs in blocks for k, v in secs.items() if v and k.startswith(prefixes)]
+
+    body = []
+    body.append(R.section("한눈에 보기", (f"<p>{R.inline(log['summary'])}</p>" if log.get("summary") else
+                                       '<p class="empty">세션 정리(/ai-lab:archive) 전이라 요약은 회의록에서만 모았습니다.</p>')
+                          + R.stats_grid([("회의", str(len(meetings))), ("기록된 결정", str(len(decisions))),
+                                          ("결과(F-)", str(len(findings))), ("실험", str(len(exps))), ("캠페인", str(len(cmps))),
+                                          ("새 할 일", str(len(actions))), ("결정 대기", str(len(asks)))])))
+    decided = subs(("답과 결정",))
+    items = [f"<h3>{R.esc(tt)}</h3>{R.md_to_html(v)}" for tt, _, v in decided]
+    if decisions:
+        items.append("<h3>지식베이스에 기록된 결정 (이유와 이견)</h3>" if decided else "")
+        for e in decisions:
+            dissent = "".join(f"<li>{R.esc(x.get('who', ''))}: {R.inline(x.get('view', ''))}</li>" for x in e.get("dissent") or [])
+            items.append(f'<div class="item decision"><strong><span class="id">{R.esc(e.get("id"))}</span> {R.esc(e.get("title", ""))}</strong>'
+                         f'<div class="meta">{R.esc(e.get("class", ""))} 등급 · 결정: {R.esc(e.get("decided_by", ""))} · {R.esc(ko_status(e.get("status", "")))}</div>'
+                         f'<p>{R.inline(e.get("decision", e.get("summary", "")))}</p>'
+                         + (f'<p class="muted">이유: {R.inline(e["reason"])}</p>' if e.get("reason") else "")
+                         + (f'<p class="muted">이견</p><ul>{dissent}</ul>' if dissent else "") + "</div>")
+    if items:
+        body.append(R.section("결정된 사항", "".join(items)))
+    if findings:
+        items = []
+        for e in findings:
+            kind = {"positive": "효과 있음", "null": "효과 없음", "negative": "부정적 결과"}.get(e.get("result_type", ""), "")
+            items.append(f'<div class="item finding"><strong><span class="id">{R.esc(e.get("id"))}</span> {R.esc(e.get("title", ""))}</strong>'
+                         f'<div class="meta">{R.esc(ko_status(e.get("status", "")))} · {R.esc(kind)} · 확신도 {R.esc(e.get("confidence", "-"))}</div>'
+                         f'<p>{R.inline(e.get("statement", e.get("summary", "")))}</p>'
+                         + (f'<p class="muted">검증하지 않은 범위: {R.inline(e["scope_limits"])}</p>' if e.get("scope_limits") else "")
+                         + (f'<p class="muted">근거: {R.inline(", ".join(map(str, e["evidence"])))}</p>' if e.get("evidence") else "") + "</div>")
+        body.append(R.section("연구 결과 (F-)", "".join(items)))
+    changes = [(c.get("target", ""), c.get("change", ""), ev.get("summary", "")) for ev in log.get("events", []) for c in ev.get("changes", [])]
+    if changes:
+        body.append(R.section("상태 변화", R.table_html(["대상", "변화", "사건"], [[R.inline(a), R.inline(b), R.inline(c)] for a, b, c in changes], raw=True)))
+    else:
+        got = subs(("가설", "상태 변화"))
+        if got:
+            body.append(R.section("상태 변화", "".join(R.md_to_html(v) for _, _, v in got)))
+    talk = subs(("논의 요약", "교수님 발언", "이견"))
+    if talk:
+        html_parts, last = [], None
+        for title, k, v in talk:
+            if title != last:
+                html_parts.append(f"<h3>{R.esc(title)}</h3>")
+                last = title
+            html_parts.append(f"<h4>{R.esc(k)}</h4>{R.md_to_html(v)}")
+        body.append(R.section("주요 논의", "".join(html_parts)))
+    work = [(t, secs.get("", "")) for t, secs in blocks if t.startswith(("작업 로그", "캠페인"))]
+    if any(v for _, v in work):
+        body.append(R.section("작업 기록", "".join(f"<h3>{R.esc(t)}</h3>{R.md_to_html(v)}" for t, v in work if v)))
+    blocks_html = [x for x in (_exp_block(lab, R, e, False) for e in exps) if x]
+    if blocks_html:
+        body.append(R.section("실험 결과", "<hr>".join(blocks_html)))
+    blocks_html = [x for x in (_cmp_block(lab, R, c, False) for c in cmps) if x]
+    if blocks_html:
+        body.append(R.section("자율 탐색 캠페인", "<hr>".join(blocks_html)))
+    if actions:
+        body.append(R.section("이 세션의 할 일", R.table_html(
+            ["ID", "담당", "할 일", "상태", "결과"],
+            [[a["id"], a.get("owner", ""), a.get("title", ""), ko_status(a.get("status", "")), a.get("result") or ""] for a in actions])))
+    if asks:
+        body.append(R.section("교수님 결정 대기", "".join(
+            f'<div class="item"><span class="id">{R.esc(q["id"])}</span> {R.inline(q["question"])}'
+            + (f'<div class="meta">선택지: {R.esc(q["options"])}</div>' if q.get("options") else "") + "</div>" for q in asks)))
+    if minutes:
+        body.append(R.section("부록: 회의록 전문", f"<details><summary>meetings/session_{num}.md 펼치기</summary>{R.md_to_html(minutes)}</details>"))
+    title = f"세션 {num} 리포트" + (f": {log['title']}" if log.get("title") else "")
+    return title, "".join(body)
+
+
+def cmd_report(args) -> None:
+    lab = need_lab(args)
+    rcfg = load_json(lab / CONFIG, {}).get("report", {})
+    if args.auto and not rcfg.get("after_activities", True):
+        return  # 교수님이 활동 뒤 자동 리포트를 꺼 두었다
+    R = _report_mod()
+    target = " ".join(args.target).strip().upper()
+    m = ID_RE.search(target)
+    if m and m.group(0).startswith(("EXP-", "CMP-")):
+        tid = m.group(0)
+        block = _cmp_block(lab, R, tid, True) if tid.startswith("CMP-") else _exp_block(lab, R, tid, True)
+        if not block:
+            sys.exit(f"오류: {tid}를 찾지 못했습니다")
+        row = resolve(lab, tid) or {}
+        title = f"{tid}: {row.get('title', '')}".rstrip(": ")
+        body, name = R.section("실험 결과" if tid.startswith("EXP-") else "자율 탐색 캠페인", block), tid
+    else:
+        nums = re.findall(r"\d{1,3}", target)
+        if nums:
+            num = f"{int(nums[0]):03d}"
+        else:
+            files = sorted((lab / "meetings").glob("session_*.md"))
+            if not files:
+                sys.exit("오류: 아직 회의록이 없습니다 (세션을 먼저 시작하세요)")
+            num = files[-1].stem[-3:]
+        title, body = _session_report(lab, R, num)
+        name = f"session_{num}"
+    cfg = load_json(lab / CONFIG, {})
+    html_text = R.page(title, f"{cfg.get('lab_name', lab.name)} · 연구실 리포트", f"만든 날 {today()}", body,
+                       f"{dt.datetime.now().strftime('%Y-%m-%d %H:%M')} 생성")
+    out = lab / "reports" / f"{name}.html"
+    write_atomic(out, html_text)
+    print(f"HTML 리포트: {out}")
+    if args.open or (args.auto and rcfg.get("open", True)):
+        try:
+            import webbrowser
+            webbrowser.open(out.as_uri())
+        except Exception:
+            pass  # 브라우저를 못 열어도 파일은 만들어져 있다
+
+
 # ---------------------------------------------------------------- 하드웨어 탐색과 운영 제약
 
 VRAM_HEADROOM = 0.9      # 화면 출력과 다른 프로그램 몫으로 10%는 남긴다
@@ -2342,6 +2644,11 @@ def main() -> None:
     p = sub.add_parser("doctor", help="실험 환경 진단"); p.add_argument("--torch", action="store_true")
     p.set_defaults(fn=cmd_doctor)
     p = sub.add_parser("map", help="연구 지도(mermaid) 만들기"); p.set_defaults(fn=cmd_map)
+    p = sub.add_parser("report", help="HTML 리포트 (세션·실험·캠페인)")
+    p.add_argument("target", nargs="*", help="세션 번호, EXP-id, CMP-id (비우면 가장 최근 세션)")
+    p.add_argument("--open", action="store_true", help="만든 뒤 브라우저로 열기")
+    p.add_argument("--auto", action="store_true", help="활동 뒤 자동 생성 (lab.config.json → report 설정을 따른다)")
+    p.set_defaults(fn=cmd_report)
     p = sub.add_parser("hardware", aliases=["hw"], help="이 PC의 하드웨어 탐색과 운영 제약")
     p.add_argument("--refresh", action="store_true", help="지금 다시 탐색"); p.set_defaults(fn=cmd_hardware)
 

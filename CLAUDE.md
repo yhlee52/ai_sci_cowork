@@ -6,7 +6,7 @@ This repo is the reusable *environment* (Claude Code plugin `ai-lab`), not resea
 - `agents/` researcher subagents (scout, engineer, explorer, critic, writer, ideator, archivist)
 - `skills/` user workflows (lab-meeting [plan|progress|review|journal|retro|1on1], brainstorm, work, campaign, paper, archive, release, lab-status, new-lab)
 - `hooks/hooks.json` SessionStart → `scripts/lab.py status --hook` (silent outside a lab)
-- `scripts/lab.py` stdlib-only: init, IDs, actions, inbox, status, KB index/find/show/context/history/digest/map/lint, audit, campaign engine, rank, lit, doctor, hardware (detects this PC → `compute.limits`, enforced by labkit), pack-md
+- `scripts/lab.py` stdlib-only: init, IDs, actions, inbox, status, KB index/find/show/context/history/digest/map/lint, audit, campaign engine, rank, lit, doctor, hardware (detects this PC → `compute.limits`, enforced by labkit), report (HTML via `scripts/report_html.py`, numbers only from files), pack-md
 - `templates/workspace/` copied verbatim by `lab.py init` (`{{LAB_NAME}}`, `{{TOPIC}}`, `{{DATE}}` substituted); KB rules in `templates/workspace/kb/README.md`, decision rules and research lifecycle in `templates/workspace/LAB.md`, shared experiment code (Run, results, stats, leakage) in `templates/workspace/labkit/`
 - `docs/` 처음_읽는_안내서 (concepts + GitHub workflow), 사용설명서 (usage), 설계_근거 (benchmarks and design principles) — all Korean; keep them in sync when commands or workflows change
 - `tests/` + `.github/workflows/tests.yml` — run `python -m unittest discover -s tests` before committing; CI runs Windows/Linux × Python 3.10/3.13

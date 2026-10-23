@@ -55,9 +55,10 @@
 | 아이디어 제안 | `research/ideas/IDEA-NNN-*.md` | IDEA- |
 | 문헌 조사 노트 | `research/literature/LIT-NNN-*.md` | LIT- |
 | 브레인스토밍 (관점별 아이디어, 점수, 최종 후보) | `research/brainstorms/BS-NNN/` (summary.md) | BS- |
-| 실험 (계획, 코드, 결과, 보고서) | `research/experiments/EXP-NNN-*/` | EXP- |
+| 실험 (계획, 승인 기록 `prereg.json`, 코드, 결과, 보고서, 이론 분석 `theory.md`) | `research/experiments/EXP-NNN-*/` | EXP- |
 | 자율 탐색 캠페인 (계약, 장부, 시도별 변경·로그, 확인 실험) | `research/campaigns/CMP-NNN-*/` (campaign.md) | CMP- |
-| 리뷰 | `research/reviews/REV-NNN.md` | REV- |
+| 리뷰 (비평 연구원의 리뷰, 검증 연구원의 코드 검증) | `research/reviews/REV-NNN.md` | REV- |
+| 요약 (논문 깊이 읽기, 교수님용 한 쪽 요약, 초안 거꾸로 읽기) | `research/summaries/SUM-NNN-*.md` | SUM- |
 | 과업 지시서 | `briefs/TASK-NNN.md` | TASK- |
 | 회사로 가져갈 릴리스 (md 파일만: 본문 + 선택적 코드 묶음) | `research/releases/REL-NNN-*/` (REL-NNN-*.md) | REL- |
 

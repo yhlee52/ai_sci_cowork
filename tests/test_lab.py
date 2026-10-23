@@ -67,6 +67,15 @@ class TestBasics(unittest.TestCase):
         self.assertIn("H-001 [가설/검증 중]", out)
         self.assertIn("H-001", lab(self.lab, "find", "--type", "hypothesis").stdout)
 
+    def test_summary_kind_is_indexed(self):
+        sid = lab(self.lab, "next", "summary").stdout.strip()
+        self.assertEqual(sid, "SUM-001")
+        (self.lab / "research/summaries/SUM-001-grokking.md").write_text(
+            "# SUM-001: Grokking 논문 요약\n> status: done | tags: grokking | session: 001 | summary: 일반화가 늦게 온다\n"
+            "근거: EXP-404\n", encoding="utf-8")
+        self.assertIn("SUM-001 [요약/완료]", lab(self.lab, "find", "--type", "요약").stdout)
+        self.assertIn("EXP-404", lab(self.lab, "lint").stdout)  # SUM 안의 ID도 참조 점검 대상
+
     def test_status_silent_outside_lab(self):
         r = lab(self.tmp, "status", "--hook")
         self.assertEqual(r.stdout.strip(), "")
@@ -79,6 +88,11 @@ class TestBasics(unittest.TestCase):
         self.assertEqual(order, ["C3", "C1", "C2", "C4"])
         sched = lab(self.lab, "rank", "schedule", "A", "B", "C").stdout
         self.assertEqual(sum(1 for ln in sched.splitlines() if " vs " in ln), 3)
+        g = self.tmp / "judge2.md"  # 두 번째 판정자: C1과 C3를 다르게 봤다
+        g.write_text("C1 > C3\nC2 > C4\nC2 > C3\nC1 > C4\nC3 > C4\nC1 > C2\n", encoding="utf-8")
+        out = lab(self.lab, "rank", "score", "--file", str(f), "--file", str(g)).stdout
+        self.assertIn("판정자 2명, 경기 12개, 판정자끼리 엇갈린 쌍 2/6개", out)
+        self.assertEqual([ln.split("|")[2].strip() for ln in out.splitlines()[3:]][0], "C1")
 
     def test_pack_unpack_roundtrip(self):
         src = self.tmp / "src"
@@ -94,6 +108,27 @@ class TestBasics(unittest.TestCase):
         self.assertEqual((out / "pkg" / "a.py").read_text(encoding="utf-8"), "x = 1\n```\nno newline\n")
         self.assertEqual((out / "b.md").read_text(encoding="utf-8"), (src / "b.md").read_text(encoding="utf-8"))
         self.assertFalse((out / "runs").exists())
+
+    def test_unpack_refuses_paths_outside_output(self):
+        evil = self.tmp / "evil.md"
+        evil.write_text("### 파일: ../escape.txt\n```\nx\n```\n\n### 파일: ok/inside.txt\n```\ny\n```\n", encoding="utf-8")
+        out = self.tmp / "out" / "deep"
+        r = lab(self.tmp, "unpack-md", str(evil), "--out", str(out))
+        self.assertIn("건너뜀", r.stdout)
+        self.assertFalse((self.tmp / "out" / "escape.txt").exists())
+        self.assertTrue((out / "ok" / "inside.txt").exists())
+        # 회사 PC에서 쓰는 복원 스크립트도 같은 규칙
+        bundle = self.tmp / "bundle.md"
+        (self.tmp / "s").mkdir()
+        (self.tmp / "s" / "a.py").write_text("x = 1\n", encoding="utf-8")
+        lab(self.tmp, "pack-md", "a.py", "--root", str(self.tmp / "s"), "--out", str(bundle))
+        snippet = bundle.read_text(encoding="utf-8").split("````python\n", 1)[1].split("\n````", 1)[0]
+        (self.tmp / "restore.py").write_text(snippet, encoding="utf-8")
+        out2 = self.tmp / "out2" / "deep"
+        subprocess.run([sys.executable, str(self.tmp / "restore.py"), str(evil), str(out2)], env=ENV,
+                       capture_output=True, check=True)
+        self.assertFalse((self.tmp / "out2" / "escape.txt").exists())
+        self.assertTrue((out2 / "ok" / "inside.txt").exists())
 
     def test_lint_flags_rule_violations(self):
         (self.lab / "kb/findings/F-001.json").write_text(json.dumps(
@@ -359,7 +394,9 @@ class TestCampaign(unittest.TestCase):
 
         for _ in range(6):
             out = lab(self.lab, "campaign", "confirm", "CMP-001").stdout
-        self.assertIn("개선 확인", out)
+        self.assertIn("개선 (95% 신뢰구간이 0보다 큼)", out)  # 실험과 같은 판정 함수(labkit.stats, Welch t)
+        confirm = json.loads((self.d / "confirm.json").read_text(encoding="utf-8"))
+        self.assertEqual(confirm["method"], "welch_t")
         self.assertEqual(lab(self.lab, "verify", "CMP-001").returncode, 0)
 
         ledger = self.d / "ledger.tsv"
@@ -399,12 +436,94 @@ class TestAudit(unittest.TestCase):
             del sys.modules[m]
         self._tmp.cleanup()
 
+    PLAN = ("# EXP-001: 비교\n> status: draft | conditions: baseline, wd | seeds: 3 | metric: val_acc\n"
+            "## 예측\n- 개선 0.05 이상\n## 성공 기준\n## 중단 기준\n")
+
+    def _experiment(self) -> tuple[Path, dict]:
+        from labkit import Run, collect_results
+        e = self.lab / "research/experiments/EXP-001-wd"
+        e.mkdir(parents=True, exist_ok=True)
+        (e / "plan.md").write_text(self.PLAN, encoding="utf-8")
+        lab(self.lab, "approve", "EXP-001", "--note", "테스트 승인")
+        for c, b in (("baseline", 0.60), ("wd", 0.70)):
+            for s in range(3):
+                with Run(e, c, s, config={"lr": 0.003}) as r:
+                    r.finish(val_acc=b + 0.01 * s)
+        return e, collect_results(e, "EXP-001", "가설", goal={"val_acc": "max"})
+
+    def test_numbers_with_korean_particles_are_checked(self):
+        e, res = self._experiment()
+        imp = res["comparisons"]["wd"]["val_acc"]["improvement"]
+        (e / "report.md").write_text(f"# EXP-001: 보고서\n> status: reported\n개선은 {imp:.2f}로 확인됐고 기준선은 0.61이다.\n"
+                                     "학습률 0.003, 예측 0.05, torch 2.5.1, Python 3.11, arXiv 2201.02177\n"
+                                     "## 3.2 결과\n", encoding="utf-8")
+        r = lab(self.lab, "audit", "EXP-001")
+        self.assertIn("숫자 4개가 결과 파일과 일치합니다", r.stdout)  # 0.10, 0.61, 0.003(설정), 0.05(사전 등록)
+        for fake in ("정확도가 0.93로 올랐다", "93%로 향상", "기준선보다 23점 높다", "효과 크기는 1.87이다"):
+            (e / "report.md").write_text(f"# EXP-001: 보고서\n> status: reported\n{fake}\n", encoding="utf-8")
+            r = lab(self.lab, "audit", "EXP-001", check=False)
+            self.assertNotEqual(r.returncode, 0, fake)  # 지어낸 숫자는 경고가 아니라 실패
+            self.assertIn("결과 파일에서 찾지 못했고 출처도 없습니다", r.stdout, fake)
+
+    def test_sourced_numbers_are_listed_not_failed(self):
+        e, _ = self._experiment()
+        (e / "report.md").write_text("# EXP-001: 보고서\n> status: reported\n원 논문 보고치는 0.87이다 (P-001).\n"
+                                     "| 데이터 크기 0.45백만 (출처: DS-001) | 기준선 0.61 |\n", encoding="utf-8")
+        r = lab(self.lab, "audit", "EXP-001")
+        self.assertIn("출처", r.stdout)
+        self.assertIn("0.87", r.stdout)
+
+    def test_source_mark_does_not_cover_the_whole_paragraph(self):
+        e, _ = self._experiment()
+        # 문단 하나 = 한 줄. 출처는 마지막 문장에만 붙었으므로 앞 문장의 지어낸 0.93은 실패해야 한다
+        (e / "report.md").write_text("# EXP-001: 보고서\n> status: reported\n기준선은 0.61이고 우리 방법은 0.93이다. "
+                                     "원 논문은 0.87을 보고했다 (출처: P-001 표 2).\n", encoding="utf-8")
+        r = lab(self.lab, "audit", "EXP-001", check=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("0.93", r.stdout.split("[실패]")[1])
+        self.assertNotIn("0.87", r.stdout.split("[실패]")[1])
+
+    def test_prereg_tampering_and_early_runs_fail(self):
+        from labkit import Run
+        e = self.lab / "research/experiments/EXP-001-wd"
+        e.mkdir(parents=True)
+        (e / "plan.md").write_text(self.PLAN, encoding="utf-8")
+        with self.assertRaises(PermissionError):  # 승인 전 본 실험은 labkit이 막는다
+            with Run(e, "baseline", 0):
+                pass
+        with Run(e, "pilot-wd", 0) as r:  # 파일럿은 자율
+            r.finish(val_acc=0.5)
+        self.assertNotEqual(lab(self.lab, "approve", "EXP-404", check=False).returncode, 0)
+        e, _ = self._experiment()
+        out = lab(self.lab, "audit", "EXP-001").stdout
+        self.assertIn("사전 등록 확인", out)
+        self.assertIn("status: approved", (e / "plan.md").read_text(encoding="utf-8"))
+        (e / "plan.md").write_text(self.PLAN.replace("0.05", "0.01"), encoding="utf-8")  # 결과를 본 뒤 예측을 고침
+        r = lab(self.lab, "audit", "EXP-001", check=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("plan.md가 바뀌었습니다", r.stdout)
+        lab(self.lab, "approve", "EXP-001", "--note", "예측 수정 승인")
+        r = lab(self.lab, "audit", "EXP-001", check=False)
+        self.assertIn("2번 승인", r.stdout)  # 다시 승인하면 통과하지만, 바꾼 사실은 경고로 남는다
+        self.assertNotIn("전에 시작한 실행", r.stdout)  # 실행은 첫 승인 뒤에 시작됐다
+        self.assertEqual(r.returncode, 0)
+
+    def test_runs_before_approval_fail_audit(self):
+        e, _ = self._experiment()
+        rec = json.loads((e / "prereg.json").read_text(encoding="utf-8"))
+        rec["approvals"][0]["at"] = "2099-01-01T00:00:00"  # 승인이 실행보다 늦은 경우
+        (e / "prereg.json").write_text(json.dumps(rec), encoding="utf-8")
+        r = lab(self.lab, "audit", "EXP-001", check=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("전에 시작한 실행", r.stdout)
+
     def test_audit_catches_plan_and_number_problems(self):
         from labkit import Run, collect_results
         e = self.lab / "research/experiments/EXP-001-wd"
         e.mkdir(parents=True)
         (e / "plan.md").write_text("# EXP-001: 비교\n> status: approved | conditions: baseline, wd, wd2 | seeds: 3 | metric: val_acc\n"
                                    "## 예측\n## 성공 기준\n## 중단 기준\n", encoding="utf-8")
+        lab(self.lab, "approve", "EXP-001")
         for c, b in (("baseline", 0.60), ("wd", 0.70)):
             for s in range(3):
                 with Run(e, c, s) as r:
@@ -417,7 +536,7 @@ class TestAudit(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("wd2", r.stdout)
         self.assertIn("0.93", r.stdout)
-        self.assertNotIn(f"{imp:.3f},", r.stdout.split("찾지 못했습니다")[-1])
+        self.assertNotIn(f"{imp:.3f}", r.stdout.split("출처도 없습니다")[-1])  # 진짜 숫자는 실패 목록에 없어야 한다
 
 
 @unittest.skipUnless(os.environ.get("AI_LAB_NET") == "1", "네트워크 테스트는 AI_LAB_NET=1일 때만")

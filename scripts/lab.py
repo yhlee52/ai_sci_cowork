@@ -15,11 +15,12 @@ agent가 필요한 것만 읽도록 돕는다. 모든 출력은 한글이다.
   lab.py context <ID>                  항목 + 참조하는/참조되는 항목의 한 줄 요약
   lab.py history <ID>                  세션 로그에서 그 항목이 바뀐 이력
   lab.py verify <EXP-id>               실험 감사: 사전 등록 + results.json이 실행 기록과 일치하는지
+  lab.py approve <EXP-id> [--note 말씀]  교수님의 본 실험 승인 기록 (plan.md 지문 → prereg.json, 이후 변경은 감사 실패)
   lab.py digest                        kb/digest.md 다시 만들기 (연구실이 아는 것 1쪽)
   lab.py pack-md <경로들> --out 묶음.md  코드 파일들을 복원 가능한 md 하나로 묶기 (회사로는 md만 가져갈 수 있다)
   lab.py unpack-md 묶음.md --out 폴더    md 묶음에서 원래 파일 복원
   lab.py campaign init|approve|baseline|begin|run|status|confirm|stop   자율 탐색 캠페인 (판정은 코드가)
-  lab.py rank schedule C1 C2 ... / rank score --file 판정.md    쌍대 비교 순위 (아이디어 토너먼트)
+  lab.py rank schedule C1 C2 ... [--seed n] / rank score --file 판정1.md [--file 판정2.md]   쌍대 비교 순위 (판정자 여러 명 합산)
   lab.py lit search|get|check           문헌 검색, 논문 조회, 논문 항목의 실존 확인 (arXiv, Semantic Scholar)
   lab.py audit <EXP-id|CMP-id>          검증 + 계획 대조 + 보고서 숫자 대조
   lab.py lint                           지식베이스 무결성 점검
@@ -81,6 +82,7 @@ KINDS = {
     "brainstorm": ("BS-", "brainstorm"),
     "release": ("REL-", "release"),
     "campaign": ("CMP-", "campaign"),
+    "summary": ("SUM-", "summary"),
     "ask": ("ASK-", None),
 }
 # kb/<폴더>/<ID>.json 형태의 항목
@@ -104,9 +106,10 @@ ARTIFACT_GLOBS = {
     "brainstorm": "research/brainstorms/BS-*",
     "release": "research/releases/REL-*",
     "campaign": "research/campaigns/CMP-*",
+    "summary": "research/summaries/SUM-*.md",
 }
 DIR_SUMMARY = ("plan.md", "campaign.md", "summary.md", "report.md", "README.md")
-ID_RE = re.compile(r"\b(?:IDEA|LIT|EXP|REV|TASK|ASK|REL|CMP|BS|DS|H|F|Q|D|P|M|A|L)-\d{3,}\b")
+ID_RE = re.compile(r"\b(?:IDEA|LIT|EXP|REV|TASK|ASK|REL|CMP|SUM|BS|DS|H|F|Q|D|P|M|A|L)-\d{3,}\b")
 PREREG_KEYS = {  # 본 실험 전에 plan.md 제목(#)에 각 묶음의 단어가 하나씩 있어야 한다
     "예측": ("예측", "prediction"),
     "성공 기준": ("성공 기준", "success"),
@@ -119,7 +122,7 @@ TYPE_KO = {
     "hypothesis": "가설", "finding": "결과", "question": "질문", "decision": "결정", "paper": "논문",
     "dataset": "데이터셋", "method": "방법", "lesson": "교훈", "idea": "아이디어", "lit": "문헌조사",
     "experiment": "실험", "review": "리뷰", "task": "과업", "brainstorm": "브레인스토밍",
-    "release": "릴리스", "session": "세션", "campaign": "캠페인",
+    "release": "릴리스", "session": "세션", "campaign": "캠페인", "summary": "요약",
 }
 STATUS_KO = {
     "proposed": "제안됨", "testing": "검증 중", "supported": "지지됨", "refuted": "반박됨",
@@ -480,7 +483,7 @@ def cmd_status(args) -> None:
                  for t, c in sorted(counts.items())]
         out.append("\n## 지식베이스\n- " + "; ".join(parts))
     if args.hook:
-        out.append(f'\n연구실 도구 (필요한 것만 읽기): python "{SELF}" find|show|context|history|digest|audit|inbox|campaign|lit|report ...')
+        out.append(f'\n연구실 도구 (필요한 것만 읽기): python "{SELF}" find|show|context|history|digest|audit|approve|inbox|campaign|lit|report ...')
     print("\n".join(out))
 
 
@@ -581,6 +584,74 @@ def print_issues(issues: list[tuple[str, str]]) -> int:
     return sum(1 for lvl, _ in issues if lvl == "실패")
 
 
+def _missing_prereg(plan: Path) -> list[str]:
+    heads = " ".join(ln for ln in plan.read_text(encoding="utf-8").lower().splitlines() if ln.startswith("#"))
+    return [key for key, words in PREREG_KEYS.items() if not any(w in heads for w in words)]
+
+
+def plan_fingerprint(plan: Path) -> str:
+    """사전 등록의 지문. 상태 값(status)만 빼고 plan.md 전체를 해시한다 — 승인 뒤 무엇이든 바뀌면 지문이 달라진다."""
+    text = plan.read_text(encoding="utf-8").replace("\r\n", "\n")
+    text = re.sub(r"(?m)^(>\s*status:\s*)[^|\n]*", r"\1*", text, count=1)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def cmd_approve(args) -> None:
+    """교수님이 본 실험(사전 등록)을 승인한 것을 기록한다 (C 등급). plan.md의 지문과 시각을 prereg.json에 남긴다."""
+    lab = need_lab(args)
+    d = exp_dir(lab, args.id.upper())
+    if d is None or not (d / "plan.md").exists():
+        sys.exit(f"오류: {args.id} 실험 폴더나 plan.md가 없습니다")
+    plan = d / "plan.md"
+    missing = _missing_prereg(plan)
+    if missing:
+        sys.exit(f"오류: plan.md에 사전 등록 항목이 없어 승인할 수 없습니다: {', '.join(missing)} (## 예측 / ## 성공 기준 / ## 중단 기준)")
+    path = d / "prereg.json"
+    rec = load_json(path, {}) or {"exp_id": args.id.upper(), "approvals": []}
+    rec["approvals"].append({"at": _now(), "sha256": plan_fingerprint(plan), "note": args.note or "교수님 승인"})
+    save_json(path, rec)
+    set_md_status(plan, "approved")
+    n = len(rec["approvals"])
+    print(f"{args.id.upper()} 본 실험 승인 기록 완료 (사전 등록 지문 {rec['approvals'][-1]['sha256'][:12]}"
+          + (f", {n}번째 승인 — 바뀐 점과 이유를 보고서에 밝힐 것" if n > 1 else "") + ")")
+    print("이 뒤에 plan.md를 고치면 감사(lab.py audit)가 실패합니다. 계획을 바꾸려면 교수님 승인 후 다시 lab.py approve.")
+
+
+def prereg_check(d: Path, res: dict | None) -> list[tuple[str, str]]:
+    """사전 등록이 지켜졌는지: 승인 기록, 승인 뒤 plan.md 변경, 승인 전에 시작한 본 실험 실행."""
+    plan = d / "plan.md"
+    rec = load_json(d / "prereg.json", None)
+    runs = (res or {}).get("runs") or []
+    if not rec or not rec.get("approvals"):
+        if runs:
+            return [("경고", "승인 기록(prereg.json)이 없어 사전 등록이 지켜졌는지 확인할 수 없습니다 "
+                             "(교수님 승인 때 lab.py approve로 기록할 것)")]
+        return []
+    issues: list[tuple[str, str]] = []
+    approvals = rec["approvals"]
+    if plan.exists() and plan_fingerprint(plan) != approvals[-1].get("sha256"):
+        issues.append(("실패", f"승인({approvals[-1].get('at')}) 뒤에 plan.md가 바뀌었습니다. 결과를 본 뒤 계획을 고치면 "
+                               "사전 등록이 무의미해집니다 — 되돌리거나, 교수님 승인 후 lab.py approve로 다시 기록하고 보고서에 밝힐 것"))
+    if len(approvals) > 1:
+        issues.append(("경고", f"계획을 바꿔 {len(approvals)}번 승인했습니다 ({', '.join(a.get('note', '') for a in approvals[1:])}) "
+                               "— 보고서에 바뀐 점과 이유를 밝힐 것"))
+    first = dt.datetime.fromisoformat(approvals[0]["at"])
+    early = []
+    for r in runs:
+        started = load_json(d / "runs" / str(r.get("run_id")) / "config.json", {}).get("started")
+        try:
+            if started and dt.datetime.fromisoformat(started) < first:
+                early.append(str(r.get("run_id")))
+        except ValueError:
+            continue
+    if early:
+        issues.append(("실패", f"승인({approvals[0]['at']}) 전에 시작한 실행이 결과에 들어 있습니다: {early[:6]} "
+                               "— 승인 전 실행(재현, 기준선 조정, 파일럿)은 조건 이름을 pilot-으로 시작해 증거에서 뺄 것"))
+    if not issues:
+        issues.append(("정보", f"사전 등록 확인: {approvals[0]['at']} 승인 뒤 plan.md 변경 없음, 모든 실행이 승인 뒤 시작"))
+    return issues
+
+
 def verify_experiment(d: Path) -> list[tuple[str, str]]:
     """사전 등록, results.json ↔ 실행 기록(runs/*/metrics.json) 일치 여부."""
     issues: list[tuple[str, str]] = []
@@ -588,14 +659,12 @@ def verify_experiment(d: Path) -> list[tuple[str, str]]:
     if not plan.exists():
         issues.append(("실패", "plan.md가 없습니다"))
     else:
-        text = plan.read_text(encoding="utf-8").lower()
-        heads = " ".join(ln for ln in text.splitlines() if ln.startswith("#"))
-        for key, words in PREREG_KEYS.items():
-            if not any(w in heads for w in words):
-                issues.append(("경고", f"plan.md에 사전 등록 항목 '{key}' 제목이 없습니다"))
+        for key in _missing_prereg(plan):
+            issues.append(("경고", f"plan.md에 사전 등록 항목 '{key}' 제목이 없습니다"))
         st = md_meta(plan).get("status", "")
         issues.append(("정보", f"계획 상태: {ko_status(st) if st else '(없음)'}"))
     res = load_json(d / "results.json", None)
+    issues += prereg_check(d, res)
     if res is None:
         issues.append(("경고", "results.json이 없습니다 (실행 전이면 정상)"))
     else:
@@ -835,10 +904,13 @@ FILE_HEADING = "### 파일: "
 # lab.py unpack-md도 똑같은 규칙을 쓴다 (둘을 함께 고칠 것).
 RESTORE_SNIPPET = r'''import pathlib, re, sys
 text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
-out_dir = pathlib.Path(sys.argv[2] if len(sys.argv) > 2 else ".")
+out_dir = pathlib.Path(sys.argv[2] if len(sys.argv) > 2 else ".").resolve()
 pattern = re.compile(r"^### 파일: (.+?)\n(`{3,})[^\n]*\n(.*?)\n\2$", re.S | re.M)
 for rel_path, fence, body in pattern.findall(text):
-    target = out_dir / rel_path.strip()
+    target = (out_dir / rel_path.strip()).resolve()
+    if out_dir not in target.parents:  # 출력 폴더 밖(../, 절대 경로)에는 쓰지 않는다
+        print("skipped (outside output folder):", ascii(rel_path))
+        continue
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(body + "\n", encoding="utf-8")
     try:
@@ -910,12 +982,15 @@ def cmd_pack_md(args) -> None:
 def cmd_unpack_md(args) -> None:
     """pack-md로 만든 md 파일에서 원래 파일들을 복원한다 (복원 스크립트와 같은 규칙)."""
     text = Path(args.md).read_text(encoding="utf-8")
-    out_dir = Path(args.out)
+    out_dir = Path(args.out).resolve()
     found = RESTORE_RE.findall(text)
     if not found:
         sys.exit("오류: 복원할 파일 블록이 없습니다")
     for rel_path, _fence, body in found:
-        target = out_dir / rel_path.strip()
+        target = (out_dir / rel_path.strip()).resolve()
+        if out_dir not in target.parents:
+            print(f"건너뜀 (출력 폴더 밖을 가리키는 경로): {rel_path.strip()}")
+            continue
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(body + "\n", encoding="utf-8")
         print("복원:", target)
@@ -1140,24 +1215,24 @@ def _mark_stopped(d: Path, st: dict, reason: str) -> None:
         set_md_status(d / "campaign.md", "stopped")
 
 
-def _bootstrap_compare(treat: list[float], base: list[float], goal: str, n_boot: int = 5000, seed: int = 0) -> dict:
-    """labkit.stats.compare와 같은 규칙 (lab.py는 표준 라이브러리만 쓰므로 따로 구현)."""
-    sign = 1.0 if goal == "max" else -1.0
-    rng = random.Random(seed)
-    imp = sign * (statistics.fmean(treat) - statistics.fmean(base))
-    boots = sorted(sign * (statistics.fmean([rng.choice(treat) for _ in treat]) -
-                           statistics.fmean([rng.choice(base) for _ in base])) for _ in range(n_boot))
-    lo, hi = boots[int(0.025 * n_boot)], boots[min(n_boot - 1, int(0.975 * n_boot))]
-    if min(len(treat), len(base)) < 2:
-        verdict = "판단 불가 (시드가 1개뿐)"
-    elif lo > 0:
-        verdict = "개선 확인 (95% 신뢰구간이 0보다 큼)"
-    elif hi < 0:
-        verdict = "오히려 악화 (95% 신뢰구간이 0보다 작음)"
-    else:
-        verdict = "판단 불가 (95% 신뢰구간이 0을 포함 — 우연일 수 있음)"
-    return {"improvement": imp, "ci_low": lo, "ci_high": hi, "verdict": verdict,
-            "p_improve": sum(1 for x in boots if x > 0) / n_boot, "n_treat": len(treat), "n_base": len(base)}
+_STATS = None
+
+
+def _stats_mod():
+    """labkit/stats.py를 그대로 불러 쓴다 (표준 라이브러리만 쓰는 파일). 실험과 캠페인의 판정 규칙을 한 곳에만 둔다."""
+    global _STATS
+    if _STATS is None:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("_labkit_stats", TEMPLATE_DIR / "labkit" / "stats.py")
+        _STATS = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_STATS)
+    return _STATS
+
+
+def _ci_text(c: dict) -> str:
+    if c.get("ci_low") is None or c.get("ci_high") is None:
+        return "신뢰구간 계산 불가 (시드 부족)"
+    return f"95% 신뢰구간 [{c['ci_low']:+.4g}, {c['ci_high']:+.4g}]"
 
 
 def _check_trial_rules(d: Path, cfg: dict, st: dict) -> tuple[list[str], dict]:
@@ -1454,7 +1529,7 @@ def _campaign_status(lab, d, cfg, st, args) -> None:
         print("- 집계: " + ", ".join(f"{ko_status(k)} {v}" for k, v in counts.items()))
     if st.get("confirm") and st["confirm"].get("result"):
         c = st["confirm"]["result"]
-        print(f"## 확인 실험: {c['verdict']} (개선 {c['improvement']:+.4g}, 95% 신뢰구간 [{c['ci_low']:+.4g}, {c['ci_high']:+.4g}])")
+        print(f"## 확인 실험: {c['verdict']} (개선 {c['improvement']:+.4g}, {_ci_text(c)})")
     print(_decision_line(cfg, st))
 
 
@@ -1497,7 +1572,7 @@ def _campaign_confirm(lab, d, cfg, st, args) -> None:
     if not base or not best:
         print("확인 실험 실행이 실패해서 비교할 수 없습니다. 로그를 확인하세요 (trials/C-*.log)")
         return
-    result = _bootstrap_compare(best, base, cfg["goal"])
+    result = _stats_mod().compare(best, base, goal=cfg["goal"])
     result.update(baseline_values=base, best_values=best, seeds=seeds, best_trial=st["best_trial"])
     conf["result"] = result
     st["confirm"] = conf
@@ -1506,7 +1581,7 @@ def _campaign_confirm(lab, d, cfg, st, args) -> None:
     set_md_status(d / "campaign.md", "confirmed")
     print(f"확인 실험 완료 ({len(best)}+{len(base)}회, 새 시드 {seeds}): {result['verdict']}")
     print(f"- 기준선 평균 {_fmt(statistics.fmean(base))}, 최종안 평균 {_fmt(statistics.fmean(best))}, "
-          f"개선 {result['improvement']:+.4g}, 95% 신뢰구간 [{result['ci_low']:+.4g}, {result['ci_high']:+.4g}]")
+          f"개선 {result['improvement']:+.4g}, {_ci_text(result)}")
 
 
 def _campaign_stop(lab, d, cfg, st, args) -> None:
@@ -1625,15 +1700,21 @@ def cmd_rank(args) -> None:
         for i, (a, b) in enumerate(pairs, 1):
             print(f"{i}. {b} vs {a}" if rng.random() < 0.5 else f"{i}. {a} vs {b}")
         return
-    text = Path(args.file).read_text(encoding="utf-8")
     games: list[tuple[str, str]] = []
-    for ln in text.splitlines():
-        m = re.match(r"^\s*(?:\d+[.)]\s*)?([\w가-힣-]+)\s*([<>])\s*([\w가-힣-]+)", ln)
-        if m:
-            a, op, b = m.groups()
-            games.append((a, b) if op == ">" else (b, a))
+    for path in args.file:  # 판정자 여러 명의 파일을 합친다 (같은 쌍을 여러 번 판정하면 그만큼 경기가 늘어난다)
+        for ln in Path(path).read_text(encoding="utf-8").splitlines():
+            m = re.match(r"^\s*(?:\d+[.)]\s*)?([\w가-힣-]+)\s*([<>])\s*([\w가-힣-]+)", ln)
+            if m:
+                a, op, b = m.groups()
+                games.append((a, b) if op == ">" else (b, a))
     if not games:
         sys.exit("오류: `A > B` 형식의 판정 줄을 찾지 못했습니다")
+    if len(args.file) > 1:
+        pairs: dict[frozenset, list[str]] = {}
+        for w, l in games:
+            pairs.setdefault(frozenset((w, l)), []).append(w)
+        split = sum(1 for ws in pairs.values() if len(set(ws)) > 1)
+        print(f"판정자 {len(args.file)}명, 경기 {len(games)}개, 판정자끼리 엇갈린 쌍 {split}/{len(pairs)}개")
     players = sorted({p for g in games for p in g})
     wins = {p: 0.0 for p in players}
     n: dict[tuple[str, str], float] = {}
@@ -1829,7 +1910,20 @@ def cmd_lit(args) -> None:
 
 # ---------------------------------------------------------------- 감사 (Chain-of-Evidence 식 점검)
 
-NUM_TOKEN = re.compile(r"(?<![\w./-])([-+−]?\d+\.\d+%?|\d+(?:\.\d+)?%)(?![\w/-])")
+# 소수, 그리고 단위(%, %p, 점, 퍼센트)가 붙은 수. 한국어 조사가 바로 붙어도 잡는다("0.93로", "93%로", "23점").
+# 영문자·숫자에 붙은 것(v0.9, EXP-001, 2.5.1)은 지표 숫자가 아니므로 건너뛴다.
+NUM_TOKEN = re.compile(r"(?<![A-Za-z0-9_./\-])([-+−]?\d+\.\d+(?:%p|%|점|퍼센트)?|\d+(?:\.\d+)?(?:%p|%|점|퍼센트))"
+                       r"(?![A-Za-z0-9_/\-]|\.\d)")
+PCT_UNITS = ("%p", "%", "점", "퍼센트")
+# 숫자처럼 보이지만 결과가 아닌 것: 주소, arXiv ID, 제목 번호, 그림·표 번호, 소프트웨어 버전
+NUM_NOISE = [re.compile(p) for p in (
+    r"https?://\S+", r"\]\([^)]*\)", r"\b\d{4}\.\d{4,5}(?:v\d+)?\b", r"(?m)^#+\s*[\d.]+\s",
+    r"(?:그림|표|절|부록|Figure|Fig\.|Table|Section)\s*\d+(?:\.\d+)*",
+    r"(?i)\b(?:python|cuda|cudnn|pytorch|torch|torchvision|numpy|uv|버전|version|compute)\s*[:=]?\s*\d+(?:\.\d+)+")]
+# 결과 파일에 없는 숫자는 같은 문장(표에서는 같은 칸)에 출처를 밝혀야 한다. 그런 숫자는 감사 출력에 목록으로 보인다.
+# 문단 하나가 한 줄인 마크다운에서 줄 단위로 면제하면 출처 하나로 문단 전체의 숫자가 빠지므로 문장 단위로 본다.
+SOURCE_MARK = re.compile(r"출처\s*:|\bP-\d{3,}\b")
+SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|\|")
 
 
 def _all_numbers(obj) -> list[float]:
@@ -1847,46 +1941,88 @@ def _all_numbers(obj) -> list[float]:
     return out
 
 
+def _text_numbers(path: Path) -> list[float]:
+    if not path.exists():
+        return []
+    out = []
+    for tok in NUM_TOKEN.findall(_strip_noise(path.read_text(encoding="utf-8"))):
+        out.append(float(tok.rstrip("%p점퍼센트").replace("−", "-")))
+    return out
+
+
 def _source_numbers(d: Path) -> list[float]:
+    """숫자의 출처로 인정하는 파일: 결과(results/confirm/장부), 캠페인 설정·상태, 실행 설정(runs/*/config.json), 사전 등록 문서."""
     nums: list[float] = []
     for src in ("results.json", "confirm.json", "campaign.json", "state.json"):
         if (d / src).exists():
             nums += _all_numbers(load_json(d / src, {}))
+    for cfg_file in sorted(d.glob("runs/*/config.json")):
+        nums += _all_numbers(load_json(cfg_file, {}).get("config", {}))
     for r in _ledger_rows(d):
         for k in ("metric", "improvement"):
             try:
                 nums.append(float(r.get(k, "")))
             except ValueError:
                 pass
+    for doc in ("plan.md", "campaign.md"):
+        nums += _text_numbers(d / doc)
     return nums
 
 
+def _strip_noise(text: str) -> str:
+    text = re.sub(r"```.*?```", " ", text, flags=re.S)
+    for pat in NUM_NOISE:
+        text = pat.sub(" ", text)
+    return text
+
+
+def _number_in(tok: str, nums: list[float]) -> bool:
+    """보고서의 숫자 하나가 출처 숫자 중 하나와 표기된 자릿수의 반올림 범위 안에서 같은지 (백분율은 ×100도 본다)."""
+    pct = tok.endswith(PCT_UNITS)
+    s = tok
+    for unit in PCT_UNITS:
+        if s.endswith(unit):
+            s = s[: -len(unit)]
+            break
+    s = s.replace("−", "-")
+    val = abs(float(s))
+    dec = len(s.split(".")[1]) if "." in s else 0
+    tol = 0.5 * 10 ** (-dec) + 1e-12
+    cands = [abs(n) for n in nums] + ([abs(n) * 100 for n in nums] if pct else [])
+    return any(abs(val - c) <= tol for c in cands)
+
+
 def report_number_check(d: Path, rep: Path | None = None, sources: list[Path] | None = None) -> list[tuple[str, str]]:
-    """보고서의 소수·백분율 숫자가 결과 파일(results.json, confirm.json, 장부)의 값과 반올림 기준으로 일치하는지."""
+    """보고서의 숫자(소수, 단위가 붙은 수)가 결과 파일의 값과 반올림 기준으로 일치하는지.
+    찾지 못한 숫자는 실패다 — 결과 파일 밖의 숫자는 같은 문장에 `출처:` 또는 P- 인용을 밝혀야 한다."""
     rep = rep or next((d / n for n in ("report.md", "summary.md") if (d / n).exists()), None)
     if rep is None:
         return [("정보", "보고서가 없어 숫자 대조를 건너뜀")]
     nums: list[float] = []
     for s in (sources or [d]):
         nums += _source_numbers(s)
-    text = re.sub(r"```.*?```", " ", rep.read_text(encoding="utf-8"), flags=re.S)
-    tokens = NUM_TOKEN.findall(text)
-    unmatched = []
-    for tok in tokens:
-        pct = tok.endswith("%")
-        s = tok.rstrip("%").replace("−", "-")
-        val = abs(float(s))
-        dec = len(s.split(".")[1]) if "." in s else 0
-        tol = 0.5 * 10 ** (-dec) + 1e-12
-        cands = [abs(n) for n in nums] + ([abs(n) * 100 for n in nums] if pct else [])
-        if not any(abs(val - c) <= tol for c in cands):
-            unmatched.append(tok)
-    if not tokens:
-        return [("정보", f"{rep.name}에 대조할 소수/백분율 숫자가 없습니다")]
+    matched: list[str] = []
+    sourced: list[str] = []
+    unmatched: list[str] = []
+    for ln in _strip_noise(rep.read_text(encoding="utf-8")).splitlines():
+        for sent in SENTENCE_SPLIT.split(ln):
+            has_source = bool(SOURCE_MARK.search(sent))
+            for tok in NUM_TOKEN.findall(sent):
+                if _number_in(tok, nums):
+                    matched.append(tok)
+                else:
+                    (sourced if has_source else unmatched).append(tok)
+    issues: list[tuple[str, str]] = []
+    if sourced:
+        issues.append(("정보", f"{rep.name}에서 결과 파일에 없지만 같은 문장에 출처(`출처:` 또는 P- 인용)를 밝힌 숫자 {len(sourced)}개 "
+                                f"— 비평가가 그 출처와 대조할 것: {', '.join(sourced[:12])}"))
     if unmatched:
-        return [("경고", f"{rep.name}의 숫자 {len(tokens)}개 중 {len(unmatched)}개는 결과 파일에서 찾지 못했습니다 "
-                        f"(출처를 밝히거나 결과 파일에서 계산할 것): {', '.join(unmatched[:12])}")]
-    return [("정보", f"{rep.name}의 숫자 {len(tokens)}개가 모두 결과 파일과 일치합니다")]
+        return issues + [("실패", f"{rep.name}의 숫자 {len(matched) + len(sourced) + len(unmatched)}개 중 {len(unmatched)}개는 "
+                                  "결과 파일에서 찾지 못했고 출처도 없습니다 (결과 파일에서 가져오거나, 다른 출처라면 같은 문장에 "
+                                  f"`출처: …`를 밝힐 것): {', '.join(unmatched[:12])}")]
+    if not matched and not sourced:
+        return issues + [("정보", f"{rep.name}에 결과 파일과 대조할 숫자가 없습니다")]
+    return issues + [("정보", f"{rep.name}의 숫자 {len(matched)}개가 결과 파일과 일치합니다")]
 
 
 def spec_check(d: Path) -> list[tuple[str, str]]:
@@ -1977,7 +2113,7 @@ def lint_issues(lab: Path) -> list[tuple[str, str]]:
         missing = sorted({m for m in ID_RE.findall(text) if m not in known and m != r["id"]})
         if missing:
             issues.append(("경고", f"{r['id']}: 없는 항목을 참조합니다 {missing[:6]}"))
-        if r["type"] in ("idea", "lit", "review", "experiment", "brainstorm", "release", "campaign") and not r["status"]:
+        if r["type"] in ("idea", "lit", "review", "experiment", "brainstorm", "release", "campaign", "summary") and not r["status"]:
             issues.append(("경고", f"{r['id']}: 머리말 메타 줄(> status: …)이 없어 검색·색인이 부정확합니다"))
     for f in sorted((lab / "kb" / "findings").glob("F-*.json")):
         e = load_json(f, {})
@@ -2094,9 +2230,9 @@ def _exp_block(lab: Path, R, eid: str, full: bool) -> str:
         rows = []
         for cond, mm in comps.items():
             for k, c in mm.items():
-                rows.append([R.esc(cond), R.esc(k), R.esc(f"{c['improvement']:+.4g}"),
-                             R.esc(f"[{c['ci_low']:+.4g}, {c['ci_high']:+.4g}]"), R.badge(c.get("verdict", ""))])
-        parts.append("<h4>기준선 대비 (코드가 계산한 부트스트랩 95% 신뢰구간)</h4>")
+                ci = "-" if c.get("ci_low") is None else f"[{c['ci_low']:+.4g}, {c['ci_high']:+.4g}]"
+                rows.append([R.esc(cond), R.esc(k), R.esc(f"{c['improvement']:+.4g}"), R.esc(ci), R.badge(c.get("verdict", ""))])
+        parts.append("<h4>기준선 대비 (코드가 계산한 95% 신뢰구간)</h4>")
         parts.append(R.table_html(["조건", "지표", "개선량", "95% 신뢰구간", "판정"], rows, raw=True, num_cols=(2, 3)))
     if res.get("notes"):
         parts.append(f'<p class="muted">{R.inline(res["notes"])}</p>')
@@ -2135,8 +2271,7 @@ def _cmp_block(lab: Path, R, cid: str, full: bool) -> str:
     parts.append(R.stats_grid(stats))
     c = (st.get("confirm") or {}).get("result")
     if c:
-        parts.append(f'<p>새 시드 확인 실험: {R.badge(c["verdict"])} 개선 {c["improvement"]:+.4g}, '
-                     f'95% 신뢰구간 [{c["ci_low"]:+.4g}, {c["ci_high"]:+.4g}]</p>')
+        parts.append(f'<p>새 시드 확인 실험: {R.badge(c["verdict"])} 개선 {c["improvement"]:+.4g}, {R.esc(_ci_text(c))}</p>')
     elif st.get("stopped"):
         parts.append(f'<p class="muted">멈춘 이유: {R.esc(st["stopped"])} · 확인 실험 전</p>')
     if rows:
@@ -2598,6 +2733,8 @@ def main() -> None:
     p.add_argument("--ref"); p.add_argument("--context"); p.add_argument("--answer")
     p.add_argument("--all", action="store_true"); p.set_defaults(fn=cmd_inbox)
     p = sub.add_parser("verify", help="실험 증거 감사"); p.add_argument("id"); p.set_defaults(fn=cmd_verify)
+    p = sub.add_parser("approve", help="본 실험(사전 등록) 승인 기록 — 교수님 결정 뒤에만")
+    p.add_argument("id"); p.add_argument("--note"); p.set_defaults(fn=cmd_approve)
     p = sub.add_parser("digest", help="지식 요약본 만들기"); p.set_defaults(fn=cmd_digest)
     p = sub.add_parser("pack-md", help="텍스트 파일들을 복원 가능한 md 하나로 묶기")
     p.add_argument("paths", nargs="+"); p.add_argument("--out", required=True); p.add_argument("--title")
@@ -2629,7 +2766,8 @@ def main() -> None:
 
     p = sub.add_parser("rank", help="쌍대 비교로 후보 순위 매기기 (Bradley-Terry)")
     p.add_argument("op", choices=["schedule", "score"])
-    p.add_argument("items", nargs="*"); p.add_argument("--file"); p.add_argument("--seed", type=int, default=0)
+    p.add_argument("items", nargs="*"); p.add_argument("--file", action="append", help="판정 파일 (판정자마다 한 번씩 반복 가능)")
+    p.add_argument("--seed", type=int, default=0, help="일정 순서와 좌우 배치 (판정자마다 다르게)")
     p.set_defaults(fn=cmd_rank)
 
     p = sub.add_parser("lit", help="문헌 검색·조회·인용 확인 (arXiv, Semantic Scholar)")

@@ -15,24 +15,27 @@ ML/DL 연구를 하는 작은 AI 연구 그룹을 Claude Code의 agent, skill, h
 
 ## 세 가지 원칙
 
-1. **방향은 사람이, 숫자는 코드가 정한다.** AI는 제안하고 구현한다. 결과 비교(부트스트랩 신뢰구간), 캠페인의 채택/기각, 증거 감사는 코드가 한다. AI의 자기 평가는 개선이 없어도 개선됐다고 착각한다는 연구 결과가 있다.
-2. **모든 주장은 추적 가능하다.** 주장 → 결과(F-) → 결과 파일 → 실행 기록, 인용 → 실존 확인된 논문(P-). 보고서의 숫자는 결과 파일과 자동 대조된다.
+1. **방향은 사람이, 숫자는 코드가 정한다.** AI는 제안하고 구현한다. 결과 비교(Welch t 신뢰구간), 캠페인의 채택/기각, 사전 등록 지키기, 증거 감사는 코드가 한다. AI의 자기 평가는 개선이 없어도 개선됐다고 착각한다는 연구 결과가 있다.
+2. **모든 주장은 추적 가능하다.** 주장 → 결과(F-) → 결과 파일 → 실행 기록, 인용 → 실존 확인된 논문(P-). 보고서의 숫자는 결과 파일과 자동 대조되고, 출처를 찾을 수 없는 숫자가 있으면 감사가 실패한다.
 3. **정직한 실패도 성공이다.** 실패, 효과 없음, 부정적 결과도 지식으로 기록한다. 끝내야 한다는 압박을 없애야 날조가 줄어든다.
 
 ## 연구팀
 
-| 역할 | 하는 일 | 구현 방식 |
-|---|---|---|
-| 교수님 | 사용자. 방향 설정과 중요 결정(C 등급) | — |
-| 수석연구원 | 회의 진행 | 메인 세션 |
-| 이론 연구원 | 이론·아이디어 | 메인 세션, 브레인스토밍 때 `ideator` |
-| 문헌 연구원 | 문헌 조사(arXiv·Semantic Scholar API), 선행연구 충돌 확인, 인용 검증 | `scout` |
-| 연구 엔지니어 | 구현·실험 (재현 → 기준선 → 파일럿 → 본 실험 → 절제 → 조건 이동 점검), 자동 탐색한 하드웨어 제약 안에서 | `engineer` |
-| 연구 엔지니어 (자율 탐색) | 교수님이 시키면 언제든, 승인된 캠페인 안에서 시도를 반복 (판정은 `lab.py`) | `explorer` |
-| 비평 연구원 | 비평 (Reviewer 2): 코드·로그·감사 결과까지 확인, 쌍대 비교 판정 | `critic` (effort high) |
-| 작성 연구원 | 분석·보고서·논문 (모든 숫자와 인용이 추적 가능하게) | `writer` |
-| 아이디어 발상가들 | 서로 다른 관점(lens)으로 독립적으로 아이디어 생성 | `ideator` × N (병렬) |
-| 기록 담당 | 세션 기록을 지식베이스로 정리, 실패한 방향·실험 전략을 기억으로 증류 | `archivist` |
+기록에는 `이름(역할)`으로 함께 적는다 (예: `엄서윤(비평 연구원)`).
+
+| 이름 | 역할 | 하는 일 | 구현 방식 |
+|---|---|---|---|
+| 교수님 | 사용자 | 방향 설정과 중요 결정(C 등급) | — |
+| 주현서 | 수석연구원 | 회의 진행 | 메인 세션 |
+| 이로운 | 이론 연구원 | 가설을 숫자 예측으로 날카롭게, 좋은 결과에는 경쟁 설명과 그것을 가르는 조건 이동 점검 | 회의에서는 메인 세션, 분석은 `theorist` |
+| 문하람 | 문헌 연구원 | 문헌 조사(arXiv·Semantic Scholar API), 선행연구 충돌 확인, 인용 검증 | `scout` (병렬 가능) |
+| 구민재 | 연구 엔지니어 | 구현·실험 (재현 → 기준선 → 파일럿 → 본 실험 → 절제 → 조건 이동 점검), 자동 탐색한 하드웨어 제약 안에서. 교수님이 시키면 승인된 캠페인 안에서 시도 반복 (판정은 `lab.py`) | `engineer`, `explorer` |
+| 진예준 | 검증 연구원 | 본 실험 전에 코드를 직접 돌려 점검: 계획-코드 일치, 평가 데이터 분리, 누수, 라벨 섞기·작은 배치 과적합·시드 점검 | `verifier` (effort high) |
+| 엄서윤 | 비평 연구원 | 비평 (Reviewer 2): 코드·로그·감사 결과까지 확인, 쌍대 비교 판정 | `critic` (effort high, 병렬 판정자) |
+| 한지우 | 작성 연구원 | 분석·보고서·논문 (모든 숫자와 인용이 추적 가능하게) | `writer` |
+| 추다인 | 요약 연구원 | 논문 한 편 깊이 읽기, 교수님용 한 쪽 요약, 초안·릴리스를 독립적으로 거꾸로 읽어 과장 잡기 | `summarizer` (논문마다 병렬) |
+| (관점별) | 아이디어 발상가들 | 서로 다른 관점(lens)으로 독립적으로 아이디어 생성 | `ideator` × N (병렬) |
+| 기다온 | 기록 담당 | 세션 기록을 지식베이스로 정리, 실패한 방향·실험 전략을 기억으로 증류 | `archivist` |
 
 ## 설치
 
@@ -65,10 +68,11 @@ GitHub에 새 버전이 올라가면 `claude plugin marketplace update ai-sci-co
 | `/ai-lab:lab-meeting journal <P-/LIT id>` | 논문 읽기 모임 |
 | `/ai-lab:lab-meeting retro` | 주기 회고. 교훈, 로드맵 변경 제안, **운영 방식 점검** |
 | `/ai-lab:lab-meeting 1on1 <역할>` | 교수님과 연구원 한 명의 1:1 |
-| `/ai-lab:brainstorm <주제>` | 병렬 독립 생성 → 선행연구 충돌 확인 → **쌍대 비교 순위** → 개선 → (파일럿 토너먼트) → 교수님 선택 |
-| `/ai-lab:work [A-001 …]` | 할 일을 담당 agent에게 맡긴다. 파일럿은 자율, 본 실험과 결정은 교수님 |
+| `/ai-lab:brainstorm <주제>` | 병렬 독립 생성 → 선행연구 충돌 확인(병렬) → **쌍대 비교 순위**(판정자 여러 명) → 개선 → (파일럿 토너먼트) → 교수님 선택 |
+| `/ai-lab:work [A-001 …]` | 할 일을 담당 agent에게 맡긴다. 파일럿은 자율 → 코드 검증·계획 리뷰(병렬) → 본 실험과 결정은 교수님 |
 | `/ai-lab:campaign [EXP-id] \| plan\|run\|status\|stop` | **자율 탐색 캠페인**: "자율 탐색해"라고 하면 계약 → 승인 → 바로 시작. 승인된 계약 안에서 시도 반복, 판정은 코드, 끝나면 새 시드 확인 실험 |
-| `/ai-lab:paper <F-id들>` | 확정된 결과로 한글 논문·보고서 초안 → 숫자·인용 감사 → 학회식 리뷰 → 수정 |
+| `/ai-lab:paper <F-id들>` | 확정된 결과로 한글 논문·보고서 초안 → 숫자·인용 감사 → 학회식 리뷰 + 초안 거꾸로 읽기(병렬) → 수정 |
+| `/ai-lab:summarize <대상> [독자]` | 요약 연구원: 논문 깊이 읽기(논문마다 병렬), 실험·캠페인·세션·주기의 한 쪽 요약, 초안 거꾸로 읽기 |
 | `/ai-lab:archive` | 세션 정리: 지식베이스·요약본·연구 지도 갱신, 점검, 인계 메모, 로컬 git 커밋 |
 | `/ai-lab:release <F-/EXP-/CMP- id>` | 회사로 가져갈 **md 문서** (근거, 한계, 사용 방법, 선택적 코드 묶음) |
 | `/ai-lab:lab-status` | 현재 상황을 싸게 요약한다 |
@@ -101,9 +105,10 @@ C 등급은 선택지와 함께 바로 여쭙고 기다린다. 교수님이 자�
 | 명령 | 하는 일 |
 |---|---|
 | `status`, `find/show/context/history`, `digest`, `map` | 현황, ID 검색, 1쪽 지식 요약(실패한 방향·효과 없음 포함), 연구 지도(mermaid) |
-| `audit <EXP/CMP>`, `audit --report <문서> --sources <ID들>` | 결과↔실행 기록 대조, 계획 준수, 보고서·논문의 숫자와 인용 대조 |
+| `approve <EXP>` | 교수님의 본 실험 승인 기록: plan.md의 지문과 시각 → `prereg.json`. 이 기록이 없으면 labkit이 본 실험을 막고, 승인 뒤 plan.md가 바뀌면 감사가 실패 |
+| `audit <EXP/CMP>`, `audit --report <문서> --sources <ID들>` | 결과↔실행 기록 대조, 사전 등록 준수(승인 뒤 실행, 계획 변경 없음), 보고서·논문의 숫자(한국어 조사가 붙어도)와 인용 대조 |
 | `campaign init/baseline/approve/begin/run/status/confirm/stop/close` | 캠페인 엔진: 실행, 시간 제한, 지표 판독, 채택/기각, 확인 실험 |
-| `rank schedule/score` | 쌍대 비교 순위 (Bradley-Terry) |
+| `rank schedule/score` | 쌍대 비교 순위 (Bradley-Terry, 판정자 여러 명의 판정 합산) |
 | `lit search/get/check` | arXiv·Semantic Scholar 검색, 논문 조회, 논문 항목 실존 확인 |
 | `lint`, `doctor` | 지식베이스 무결성 점검, 실험 환경 진단 |
 | `report` | 세션·실험·캠페인의 결정, 결과, 그래프를 모은 **HTML 리포트** (`reports/`). 회의·작업·캠페인·세션 정리 뒤에 자동 생성, 숫자는 모두 결과 파일에서 |
@@ -124,7 +129,7 @@ C 등급은 선택지와 함께 바로 여쭙고 기다린다. 교수님이 자�
 
 ## 토큰 절약 설계
 
-1. 회의는 한 컨텍스트에서 여러 관점으로 진행하고, 병렬 agent는 독립성이 품질을 올리는 곳(브레인스토밍, 깊은 리뷰)에만 쓴다.
+1. 회의는 한 컨텍스트에서 여러 관점으로 진행하고, 병렬 agent는 독립성이 품질을 올리는 곳에만 쓴다: 브레인스토밍 생성, 선행연구 확인, 쌍대 판정, 같은 대상에 대한 서로 다른 점검(검증+비평, 비평+이론, 리뷰+거꾸로 읽기), 논문별 요약.
 2. 세션 시작 주입은 약 40줄, 나머지는 ID로 필요할 때만 읽는다. subagent는 40줄 이하의 brief만 읽고 10줄 이하로 보고한다.
 3. 기계적인 일(ID, 검색, 감사, 캠페인 판정, 요약본, 지도)은 `lab.py`가 한다. 공용 코드 `labkit`을 재사용한다.
 4. 예산 프로필(`economy`/`standard`/`deep`)로 회의 라운드, 리뷰 횟수, 병렬 agent 수, 브레인스토밍 인원, 파일럿 토너먼트, 캠페인 배치 크기가 함께 바뀐다.
@@ -134,8 +139,8 @@ C 등급은 선택지와 함께 바로 여쭙고 기다린다. 교수님이 자�
 
 ```
 .claude-plugin/     plugin.json, marketplace.json
-agents/             scout, engineer, explorer, critic, writer, ideator, archivist
-skills/             lab-meeting, brainstorm, work, campaign, paper, archive, release, lab-status, new-lab
+agents/             scout, engineer, explorer, verifier, theorist, critic, writer, summarizer, ideator, archivist
+skills/             lab-meeting, brainstorm, work, campaign, paper, summarize, archive, release, lab-status, new-lab
 hooks/hooks.json    SessionStart → lab.py status --hook
 scripts/lab.py      연구실 도구 (Python 표준 라이브러리만 사용)
 templates/workspace/  새 연구실 템플릿 (LAB.md, ROADMAP.md, team.md, state/, kb/, labkit/, research/)

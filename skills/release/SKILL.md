@@ -40,7 +40,9 @@ The lab runs outside the company. Only **.md files** can be brought inside, and 
 
 Never include: `kb/`, `meetings/`, `briefs/`, agent memory, API keys/tokens, `.env`, absolute personal paths, data files.
 
-Before recording: `lab.py audit --report <main .md> --sources <EXP/CMP ids>` must find no unknown numbers.
+Before recording:
+- `lab.py audit --report <main .md> --sources <EXP/CMP ids>` must find no unknown numbers.
+- `ai-lab:summarizer`, mode `reverse`, audience 회사, given only the main .md: inside the company nobody can ask the lab what was meant, so any claim the reader would take away that is stronger than `## 적용 범위와 한계` allows, or any step of `## 사용 방법` it could not follow, is fixed before release.
 
 ## 3. Record
 - Append to the current `meetings/session_NNN.md` under `## 릴리스`: REL id, included ids, whether code was bundled, 교수님's approval, caveats. The archivist files it.

@@ -8,11 +8,15 @@
 
 finish() 없이 블록을 벗어나면(예: 예외 발생) 상태가 "failed"로 기록된다.
 지표를 지어내거나 채워 넣지 않는다 — 실패한 실행은 실패로 남긴다.
+
+본 실험 관문: exp_dir에 plan.md가 있으면, 조건 이름이 `pilot-`으로 시작하지 않는 실행은
+교수님 승인 기록(`lab.py approve <EXP-id>` → prereg.json)이 있어야 시작된다.
 """
 from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 from pathlib import Path
 
@@ -38,6 +42,7 @@ class Run:
 
     # 컨텍스트 매니저 ----------------------------------------------------------
     def __enter__(self) -> "Run":
+        self._check_approval()
         self.dir.mkdir(parents=True, exist_ok=True)
         if self._set_seed:
             seed_everything(self.seed)
@@ -78,6 +83,16 @@ class Run:
         print(f"[{self.run_id}] {STATUS_KO.get(self.status, self.status)} {self.wall_minutes:.1f}분{vram} " +
               " ".join(f"{k}={v:.4g}" if isinstance(v, float) else f"{k}={v}" for k, v in self.final.items()))
         return False  # 예외를 삼키지 않는다
+
+    def _check_approval(self) -> None:
+        """본 실험은 승인 뒤에만 (C 등급). 캠페인 안의 실행은 캠페인 계약 승인으로 대신한다."""
+        if str(self.condition).startswith("pilot") or os.environ.get("LAB_CAMPAIGN"):
+            return
+        if (self.exp_dir / "plan.md").exists() and not (self.exp_dir / "prereg.json").exists():
+            raise PermissionError(
+                f"본 실험 '{self.run_id}'은(는) 교수님 승인 뒤에만 실행합니다: plan.md는 있지만 승인 기록(prereg.json)이 없습니다. "
+                "파일럿·재현·기준선 조정이면 조건 이름을 'pilot-'으로 시작하고, 본 실험이면 교수님 승인 후 "
+                "lab.py approve <EXP-id>를 먼저 실행하세요.")
 
     # 사용 함수 ----------------------------------------------------------------
     @property

@@ -11,7 +11,19 @@
     "deny": [
       "Bash(rm -rf *)",
       "Bash(git push --force*)",
-      "Bash(git reset --hard*)"
+      "Bash(git reset --hard*)",
+      "Edit(/state/*.json)",
+      "Edit(/kb/index.json)",
+      "Edit(/kb/digest.md)",
+      "Edit(/kb/map.md)",
+      "Edit(/research/experiments/*/prereg.json)",
+      "Edit(/research/experiments/*/results.json)",
+      "Edit(/research/campaigns/*/campaign.json)",
+      "Edit(/research/campaigns/*/state.json)",
+      "Edit(/research/campaigns/*/ledger.tsv)",
+      "Edit(/research/campaigns/*/confirm.json)",
+      "Edit(/research/campaigns/*/baseline/**)",
+      "Edit(/research/campaigns/*/best/**)"
     ]
   }
 }

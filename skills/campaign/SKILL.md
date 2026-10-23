@@ -16,6 +16,7 @@ Subcommand = first word of `$ARGUMENTS`. Without one — 교수님 simply asked 
 2. Campaign-ready code (delegate to `ai-lab:engineer` via a short brief if missing): in the experiment's `src/`, `train.py` = what may change; `evaluate.py` = fixed evaluation that prints `LAB_METRIC <metric>=<value>` via `labkit.report_metric` (so the metric can't be faked from train.py); one run finishes within the trial budget (fixed steps or `labkit.Run(max_minutes=…)`) and fits `lab.config.json → compute.limits`; data from `data/` via `LAB_ROOT`; seed from `labkit.seed_from_env()`.
 3. `lab.py campaign init --from <src> --title "<한글 제목>" --slug <slug> --metric <m> --goal min|max --run "uv run python train.py" --eval "uv run python evaluate.py" --editable train.py --protected evaluate.py --trial-minutes <≤7> --max-trials <n> --max-hours <h> --patience <p>` — defaults from `lab.config.json → campaign`.
 4. Fill `campaign.md` (Korean): goal chain, allowed kinds of changes, anything forbidden beyond the defaults.
+4b. `ai-lab:verifier` on the campaign's code (target `CMP-xxx`, focus: can `train.py` influence the metric other than by training better — reading eval labels, changing the eval data, printing metric lines; is the metric computed on held-out data; does one run fit the trial budget). A `major`/`reject` → back to the engineer before the baseline is measured.
 5. Measure the baseline: `lab.py campaign baseline <CMP>` repeatedly until it prints 완료 (each call = one run, Bash timeout 600000). Report the noise and the keep threshold δ.
 6. Put the contract to 교수님 — **class C**. Use the AskUserQuestion tool: options `승인하고 바로 시작` / `승인만 (시작은 나중에)` / `예산을 줄여 승인` / `보류`, each with one line (trials × minutes ≈ hours, metric, what may change). On approval: `lab.py campaign approve <CMP> --note "<교수님 말씀 요약>"`; record the decision in the minutes.
 7. Start: on `승인하고 바로 시작`, continue with `run` right away in this session. Otherwise tell them both ways to start: now, with `/ai-lab:campaign run <CMP>`; or unattended for hours (away, overnight), with the `/goal` line (see **자리를 비우고 오래 돌리기**).
@@ -31,7 +32,7 @@ If something needs a human (environment keeps crashing, the contract looks wrong
 
 Wrap-up (still unattended):
 1. `lab.py campaign confirm <CMP>` repeatedly until it prints 완료 (fresh seeds, baseline vs best, CI).
-2. `ai-lab:writer` → `summary.md`; `ai-lab:critic` → a REV on the campaign (kept patches, confirmation, gaming check); `lab.py audit <CMP>` must pass.
+2. In parallel (one message): `ai-lab:writer` → `summary.md`; `ai-lab:critic` → a REV on the campaign (kept patches, confirmation, gaming check). Then `lab.py audit <CMP>` must pass.
 3. `lab.py inbox add --from lead --question "<CMP> 결과를 결과(F-)로 확정할까요? <한 줄 요약>" --options "확정|잠정으로 두기|추가 확인 실험|기각" --ref <CMP>`.
 4. `lab.py report <CMP> --auto` (HTML report: progress chart, kept trials, confirmation). Rewrite `state/lab_state.md` (인계 메모: what ran, the verdict, the ASK id); local git commit `캠페인 <CMP> 종료` if auto_commit.
 5. Final message (≤10 lines, Korean): trials run, best vs baseline, confirmation verdict with CI, review verdict, the ASK id, the report path, and what 교수님 should look at first.

@@ -9,7 +9,7 @@ argument-hint: "<topic or question> [lenses: theory,empirical,...]"
 Design (from the co-scientist / ideation literature): independent parallel generation keeps ideas diverse; ideas are compared **in pairs** (absolute LLM scores are poorly calibrated); prior art is checked with real bibliographic search; and because ideas look better on paper than after execution, the top candidates can get a 2-minute **pilot** before 교수님 chooses. Tool: `python "${CLAUDE_PLUGIN_ROOT}/scripts/lab.py"`.
 
 ## 0. Setup
-1. Profile from `lab.config.json`: `brainstorm_agents` (N), `ideas_per_agent`, `pilot_tournament`, compute budget. Lenses: those named in `$ARGUMENTS`, else the first N rows of the lens table in `team.md`.
+1. Profile from `lab.config.json`: `brainstorm_agents` (N), `ideas_per_agent`, `rank_judges` (J), `max_parallel_agents`, `pilot_tournament`, compute budget. Lenses: those named in `$ARGUMENTS`, else the first N rows of the lens table in `team.md`.
 2. `lab.py next brainstorm` → `BS-xxx`; create `research/brainstorms/BS-xxx/`.
 3. Write `brief.md` there (≤40 lines, Korean): topic, goal chain (ROADMAP milestone → Q-/H-), constraints (the hardware limits from `lab.config.json → compute.limits` in one line, pilot ≤2 min, full-run budget), **what the lab already knows** and **what already failed** — from `kb/digest.md` ("실패한 방향", "효과 없음" sections) and 1–3 `lab.py find` queries, as one-liners with ids.
 
@@ -19,14 +19,14 @@ Launch N `ai-lab:ideator` subagents **in one message** (parallel). Each prompt: 
 ## 2. Merge (you, cheap)
 Read the N `<lens>.md` files. Deduplicate and cluster near-identical ideas (keep the best elements, credit all source lenses). Write `candidates.md`: C1…Ck (k ≤ 6), each 3 lines: idea, falsifiable hypothesis, pilot + cost. Keep one high-novelty "wildcard" even if risky.
 
-## 3. Prior-art check (`ai-lab:scout`, mode `scoop-check`)
-Brief: candidates.md, ≤3 sources per candidate, output `research/brainstorms/BS-xxx/scoop.md`. A candidate that is `이미 있음` is dropped or reframed around its stated difference.
+## 3. Prior-art check (`ai-lab:scout`, mode `scoop-check`) — parallel
+Split the candidates into up to `max_parallel_agents` groups and launch one scout per group **in one message**. Brief: its candidates, ≤3 sources per candidate, output `research/brainstorms/BS-xxx/scoop-<g>.md`. Merge into `scoop.md`. A candidate that is `이미 있음` is dropped or reframed around its stated difference.
 
-## 4. Pairwise ranking (`ai-lab:critic`)
-`lab.py rank schedule C1 C2 … Ck` → put the printed pair list in the critic's brief; the critic writes `research/brainstorms/BS-xxx/pairs.md` with one `Cx > Cy | 이유` line per pair (it also sees scoop.md). Then `lab.py rank score --file research/brainstorms/BS-xxx/pairs.md` → ranking table (deterministic Bradley-Terry). Save the table to `ranking.md`.
+## 4. Pairwise ranking (`ai-lab:critic` × J judges) — parallel
+For judge j = 1…J: `lab.py rank schedule C1 C2 … Ck --seed <j>` (each judge gets a different order and left/right placement — LLM judges favour one position) → that list in judge j's brief; launch all J critics **in one message**, each writing `research/brainstorms/BS-xxx/pairs-<j>.md` with one `Cx > Cy | 이유` line per pair (each also sees scoop.md, not the other judges' files). Then `lab.py rank score --file …/pairs-1.md [--file …/pairs-2.md …]` → ranking table (deterministic Bradley-Terry over all judges' games) and how many pairs the judges split on. Save it to `ranking.md`; pairs the judges split on are genuinely close — say so to 교수님.
 
 ## 5. Refine the top 3 (you)
-One improvement pass per top candidate: fix the critic's main objection, simplify, or combine complementary candidates. Don't invent new directions here.
+One improvement pass per top candidate: fix the critic's main objection, simplify, or combine complementary candidates. Don't invent new directions here. In the `standard`/`deep` profiles, launch `ai-lab:theorist` (mode `predict`) for the top 2 **in parallel** to make each hypothesis and kill criterion quantitative.
 
 ## 6. Pilot tournament (if `pilot_tournament` is on in the profile)
 For the top 2: an `ai-lab:engineer` pilot each (class A, ≤2 min, 1 seed, clearly labelled pilot). A pilot says only "code works / any signal / real cost", never "better".
@@ -36,7 +36,7 @@ Present in Korean:
 ```
 | 후보 | 가설 (반증 조건) | 선행연구 확인 | 순위(점수) | 파일럿 신호 | 비용 | 가장 큰 위험 |
 ```
-top 3 + wildcard, then a short **수석연구원의 추천** with the reason. Ask with the AskUserQuestion tool (options: 1순위 진행 / 2순위 진행 / 결합 / 한 라운드 더 — each with a one-line trade-off; 교수님 can always type something else). **Wait.** Discuss in the lab-meeting voice if 교수님 wants to debate.
+top 3 + wildcard, then a short **주현서(수석연구원)의 추천** with the reason. Ask with the AskUserQuestion tool (options: 1순위 진행 / 2순위 진행 / 결합 / 한 라운드 더 — each with a one-line trade-off; 교수님 can always type something else). **Wait.** Discuss in the lab-meeting voice if 교수님 wants to debate.
 
 ## 8. Record the decision
 - `summary.md` in the BS dir: `# BS-xxx: <topic>` + `> status: decided | tags: … | session: NNN | summary: <what was chosen>`; the table, 교수님's decision and reasons, and rejected candidates in one line each (they stay searchable).

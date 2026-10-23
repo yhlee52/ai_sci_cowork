@@ -22,10 +22,11 @@ Show: working title, the 1–3 claims (with F-ids), what is explicitly **not** c
 `# 제목` + `> status: draft | tags | session | summary`; 초록 · 서론 · 관련 연구 ([P-xxx]로 인용) · 방법 · 실험 설정 · 결과 (표와 그림은 결과 파일에서 다시 생성) · 한계와 검증하지 않은 범위 · 부정적 결과 · 결론 · 재현 정보 · 참고문헌 (P- 항목의 제목, 저자, 연도, 링크).
 
 ## 4. Audit (you)
-`lab.py audit --report research/papers/<slug>/paper.md --sources <EXP/CMP ids>` → fix every unknown number and missing citation.
+`lab.py audit --report research/papers/<slug>/paper.md --sources <EXP/CMP ids>` → fix every unknown number (실패) and missing citation; numbers from papers stay in sentences that cite their P- id.
 
-## 5. Review (`ai-lab:critic`, conference-style)
-REV with: 요약, 강점, 약점, 질문, 재현 가능성, 주장-증거 일치, 점수 1–10과 근거. In the `deep` profile, two critics independently (methods vs. claims), merged.
+## 5. Review — in parallel, one message
+- `ai-lab:critic`, conference-style: REV with 요약, 강점, 약점, 질문, 재현 가능성, 주장-증거 일치, 점수 1–10과 근거. In the `deep` profile, two critics independently (methods vs. claims), merged.
+- `ai-lab:summarizer`, mode `reverse`: give it **only** the draft path (not the outline) → `SUM-xxx`. Compare its "실제로 하는 주장" with the claims 교수님 approved in §2: any claim that is stronger, missing, or new is a revision item.
 
 ## 6. Revise once, then report
-Writer revises against the REV; re-run the audit. Tell 교수님 (≤8 lines): path, claims made, audit result, review verdict, what remains weak. Record in the minutes; status stays `draft` until 교수님 approves it.
+Writer revises against the REV and the reverse-read gaps; re-run the audit. Tell 교수님 (≤8 lines): path, claims made, audit result, review verdict, what remains weak. Record in the minutes; status stays `draft` until 교수님 approves it.

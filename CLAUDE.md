@@ -3,11 +3,11 @@
 This repo is the reusable *environment* (Claude Code plugin `ai-lab`), not research output. Research happens in separate workspaces created by `/ai-lab:new-lab`; never put research artifacts here. Labs run outside the company only; only markdown files can be carried into the company, so releases (`/ai-lab:release`) are .md documents plus an optional restorable code bundle (`lab.py pack-md`/`unpack-md`). No company data ever enters a lab; the company side is out of scope.
 
 - `.claude-plugin/` plugin.json + marketplace.json (marketplace `ai-sci-cowork`, published at github.com/yhlee52/ai_sci_cowork)
-- `agents/` researcher subagents (scout, engineer, explorer, critic, writer, ideator, archivist)
-- `skills/` user workflows (lab-meeting [plan|progress|review|journal|retro|1on1], brainstorm, work, campaign, paper, archive, release, lab-status, new-lab)
+- `agents/` researcher subagents (scout, engineer, explorer, verifier, theorist, critic, writer, summarizer, ideator, archivist); each has a Korean name + role (`team.md`), written as `이름(역할)` in records
+- `skills/` user workflows (lab-meeting [plan|progress|review|journal|retro|1on1], brainstorm, work, campaign, paper, summarize, archive, release, lab-status, new-lab)
 - `hooks/hooks.json` SessionStart → `scripts/lab.py status --hook` (silent outside a lab)
-- `scripts/lab.py` stdlib-only: init, IDs, actions, inbox, status, KB index/find/show/context/history/digest/map/lint, audit, campaign engine, rank, lit, doctor, hardware (detects this PC → `compute.limits`, enforced by labkit), report (HTML via `scripts/report_html.py`, numbers only from files), pack-md
-- `templates/workspace/` copied verbatim by `lab.py init` (`{{LAB_NAME}}`, `{{TOPIC}}`, `{{DATE}}` substituted); KB rules in `templates/workspace/kb/README.md`, decision rules and research lifecycle in `templates/workspace/LAB.md`, shared experiment code (Run, results, stats, leakage) in `templates/workspace/labkit/`
+- `scripts/lab.py` stdlib-only: init, IDs, actions, inbox, status, approve (pre-registration fingerprint → prereg.json), KB index/find/show/context/history/digest/map/lint, audit, campaign engine, rank, lit, doctor, hardware (detects this PC → `compute.limits`, enforced by labkit), report (HTML via `scripts/report_html.py`, numbers only from files), pack-md
+- `templates/workspace/` copied verbatim by `lab.py init` (`{{LAB_NAME}}`, `{{TOPIC}}`, `{{DATE}}` substituted); KB rules in `templates/workspace/kb/README.md`, decision rules and research lifecycle in `templates/workspace/LAB.md`, shared experiment code (Run with the full-run approval gate, results, stats = Welch t, also loaded by lab.py, leakage) in `templates/workspace/labkit/`
 - `docs/` 처음_읽는_안내서 (concepts + GitHub workflow), 사용설명서 (usage), 설계_근거 (benchmarks and design principles) — all Korean; keep them in sync when commands or workflows change
 - `tests/` + `.github/workflows/tests.yml` — run `python -m unittest discover -s tests` before committing; CI runs Windows/Linux × Python 3.10/3.13
 

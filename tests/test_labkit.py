@@ -28,6 +28,29 @@ class TestStats(unittest.TestCase):
         self.assertTrue(c["verdict"].startswith("판단 불가"))
         self.assertTrue(c["notes"])
 
+    def test_t_quantiles_match_tables(self):
+        from labkit.stats import t_ppf
+        for df, expected in ((1, 12.706), (2, 4.303), (4, 2.776), (10, 2.228), (30, 2.042)):
+            self.assertAlmostEqual(t_ppf(0.975, df), expected, places=3)
+
+    def test_no_effect_rarely_called_improvement(self):
+        # 부트스트랩 백분위 구간은 시드 3개에서 효과가 없는데도 약 11%를 "개선"이라 했다 (명목 2.5%)
+        import random
+        rng = random.Random(7)
+        n = 1500
+        fp = sum(compare([rng.gauss(0, 1) for _ in range(3)], [rng.gauss(0, 1) for _ in range(3)])["verdict"].startswith("개선")
+                 for _ in range(n))
+        self.assertLess(fp / n, 0.04)
+
+    def test_lab_py_uses_the_same_rule(self):
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+        try:
+            import lab
+        finally:
+            sys.path.pop(0)
+        a, b = [0.71, 0.72, 0.70], [0.65, 0.66, 0.64]
+        self.assertEqual(lab._stats_mod().compare(a, b, goal="max"), compare(a, b, goal="max"))
+
     def test_summarize_and_bootstrap(self):
         self.assertEqual(summarize([1, 2, 3])["mean"], 2.0)
         self.assertIsNone(bootstrap_ci([1.0]))

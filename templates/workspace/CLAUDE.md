@@ -12,7 +12,7 @@ Research workspace driven by the `ai-lab` plugin. The human user is **교수님*
 ## Decisions — never let the lab drift (LAB.md § 의사결정 규칙)
 - **A autonomous**: implementation, hparams inside an approved plan, debugging, pilots (≤2 min, 1 seed), literature search, trials inside an approved campaign.
 - **B consult a peer** (usually critic) and record it: design changes inside an approved plan, ambiguous results.
-- **C 교수님 only**: new direction, full-run start (plan.md `approved`), campaign contract, abandoning a hypothesis, accepting a finding, over-budget, roadmap/cycle changes, contradictions with accepted findings, unclear instructions.
+- **C 교수님 only**: new direction, full-run start (record it with `lab.py approve EXP-xxx`), campaign contract, abandoning a hypothesis, accepting a finding, over-budget, roadmap/cycle changes, contradictions with accepted findings, unclear instructions.
 - For C: ask 교수님 with the AskUserQuestion tool and wait. If they're away or defer, `lab.py inbox add ...` and continue only with work that doesn't depend on it. When unsure of the class, go one class up. During an approved campaign run, never ask — stop and queue the question instead.
 - Open inbox items are shown at session start — raise them before anything else.
 
@@ -24,15 +24,15 @@ Long-term `ROADMAP.md` (요약 is injected) · mid-term `state/cycle.md` (inject
 - IDs, actions, inbox, index, digest, map come from `lab.py` only; don't hand-edit files under `state/*.json`, `kb/index.json`, `kb/digest.md`, `kb/map.md`, or campaign `ledger.tsv`/`state.json`.
 
 ## Workflow
-Cycle start `/ai-lab:lab-meeting plan` → per session: `lab-meeting` (progress/review/journal) · `/ai-lab:brainstorm` · `/ai-lab:work` · `/ai-lab:campaign` (bounded autonomous search, whenever 교수님 asks) → session end `/ai-lab:archive` → cycle end `/ai-lab:lab-meeting retro`. Write-ups: `/ai-lab:paper`, `/ai-lab:release`. Overview: `/ai-lab:lab-status`. HTML report on request: `lab.py report [session NNN|EXP-id|CMP-id] --open`.
+Cycle start `/ai-lab:lab-meeting plan` → per session: `lab-meeting` (progress/review/journal) · `/ai-lab:brainstorm` · `/ai-lab:work` · `/ai-lab:campaign` (bounded autonomous search, whenever 교수님 asks) → session end `/ai-lab:archive` → cycle end `/ai-lab:lab-meeting retro`. Write-ups: `/ai-lab:paper`, `/ai-lab:release`, `/ai-lab:summarize`. Overview: `/ai-lab:lab-status`. Team (names, roles): `team.md`; write people as `이름(역할)`. HTML report on request: `lab.py report [session NNN|EXP-id|CMP-id] --open`.
 
 ## Data boundary
 This lab runs outside the company; the company only receives releases (`/ai-lab:release`). Everything read here goes to the API, so **never ingest company data, internal code/docs/metrics, or customer information** — public data, public papers, or synthetic data only. If something looks company-internal, stop and ask 교수님.
 
 ## Research integrity
-- Never invent numbers, citations, or results. `results.json` comes from `labkit.collect_results` (with baseline comparisons and CIs); run `lab.py audit <EXP|CMP>` before reporting; citations only from P- entries that pass `lab.py lit check`.
+- Never invent numbers, citations, or results. `results.json` comes from `labkit.collect_results` (with baseline comparisons and CIs); run `lab.py audit <EXP|CMP>` before reporting — a number not found in the result files fails it unless its sentence names the source (`출처: …` or a P- id); citations only from P- entries that pass `lab.py lit check`.
 - If a run fails or data is missing, report it. Never substitute synthetic/placeholder data, never reframe a bug as a finding, never claim beyond the tested regime; mechanism claims need a regime-shift check.
-- Pre-register (prediction, success and kill criteria in plan.md) before any full run. Reuse `labkit/` code. Check leakage (`labkit.check_overlap`) when a result looks too good.
+- Pre-register (prediction, success and kill criteria in plan.md) before any full run; after `lab.py approve` the plan is frozen (the audit compares its fingerprint). Before approval, runs are named `pilot-…`. Reuse `labkit/` code. Check leakage (`labkit.check_overlap`) when a result looks too good.
 
 ## Ownership
 - `kb/` entities: archivist (`/ai-lab:archive`); `kb/papers/`: scout. `ROADMAP.md` and `LAB.md`: changed only with 교수님's approval.

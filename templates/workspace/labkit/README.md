@@ -4,9 +4,9 @@
 
 | 모듈 | 제공하는 것 |
 |---|---|
-| `run.py` | `Run` — 실행 하나당 폴더 하나: `config.json`(설정, 시드, git 커밋, 환경), `train.log`, `metrics.jsonl`, `metrics.json`(최종 지표) |
+| `run.py` | `Run` — 실행 하나당 폴더 하나: `config.json`(설정, 시드, git 커밋, 환경), `train.log`, `metrics.jsonl`, `metrics.json`(최종 지표). 실험 폴더에 plan.md가 있으면 `pilot-`이 아닌 실행은 교수님 승인 기록(`lab.py approve` → `prereg.json`)이 있어야 시작된다 |
 | `results.py` | `collect_results(exp_dir, exp_id, hypothesis, setup, goal=…)` → 실행 기록에서 `results.json`을 만든다. 조건별 평균·표준편차·개수, 그리고 기준선(`baseline`) 대비 **개선량과 95% 신뢰구간**(`comparisons`). 파일럿은 제외한다 |
-| `stats.py` | `compare(treat, base, goal)` 부트스트랩 신뢰구간 비교 (판정: 개선 / 악화 / 판단 불가), `bootstrap_ci`, `summarize` |
+| `stats.py` | `compare(treat, base, goal)` Welch t 95% 신뢰구간 비교 (판정: 개선 / 악화 / 판단 불가). 시드가 적어도 효과가 없을 때 "개선"이 나올 확률이 명목 수준(2.5%) 이하. `summarize`, `bootstrap_ci`(탐색용) |
 | `leakage.py` | `check_overlap(train, test)` — 평가 데이터가 학습 데이터와 겹치는지 (결과가 너무 좋을 때 가장 먼저) |
 | `train.py` | `fit(...)` — AMP, 기울기 자르기, 평가, 시간 예산, 체크포인트 이어하기를 갖춘 PyTorch 학습 루프 |
 | `limits.py` | `lab_limits()` — `lab.py hardware`가 이 PC를 탐색해 건 운영 제약(장치, 정밀도, VRAM 예산, 모델 크기, DataLoader workers). `Run`과 `get_device()`가 VRAM 예산을 자동으로 걸고, `Run`이 최대 VRAM 사용량(`peak_vram_gb`)을 기록한다 |
@@ -49,5 +49,6 @@ print(res["comparisons"]["ours"]["val_acc"]["verdict"])   # 예: "개선 (95% �
 
 - 조건 이름과 지표 이름(예: `baseline`, `val_acc`)은 코드 식별자라서 영어로 쓴다. 설명 문장, 주석, 로그 메시지, 그림 글자는 한글로 쓴다.
 - 기준 조건의 이름은 `baseline`으로 한다 (그래야 비교가 자동으로 계산된다).
-- 파일럿 실행은 조건 이름을 `pilot-`으로 시작한다. `collect_results`가 자동으로 제외한다.
+- 승인 전의 실행(파일럿, 재현, 기준선 조정, 검증 연구원의 점검)은 조건 이름을 `pilot-`으로 시작한다. `collect_results`가 자동으로 제외하고, 승인 관문도 통과한다.
+- 보고서에 쓸 하이퍼파라미터는 `Run(config=...)`에 넣는다. 감사가 실행 설정(`config.json`)의 숫자도 출처로 인정한다.
 - 공용 데이터 로더는 `labkit/data_<이름>.py`, 모델은 `labkit/models/<이름>.py`에 둔다.

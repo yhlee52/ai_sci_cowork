@@ -13,7 +13,7 @@ def collect_results(exp_dir: str | Path, exp_id: str, hypothesis: str, setup: di
     """hypothesis, setup의 설명 문장과 notes는 한글로 쓴다.
 
     baseline: 기준 조건 이름. 그 조건이 있고 goal이 주어지면, 다른 조건마다 기준 대비 개선량과
-              부트스트랩 95% 신뢰구간을 `comparisons`에 넣는다 (보고서의 차이 수치는 여기서 가져온다).
+              95% 신뢰구간(Welch t)을 `comparisons`에 넣는다 (보고서의 차이 수치는 여기서 가져온다).
     goal: 지표별 방향. 예: {"val_acc": "max", "val_loss": "min"} 또는 모든 지표에 같은 "max"/"min".
     """
     exp_dir = Path(exp_dir)

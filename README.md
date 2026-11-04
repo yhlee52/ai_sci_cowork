@@ -2,44 +2,19 @@
 
 [![테스트](https://github.com/yhlee52/ai_sci_cowork/actions/workflows/tests.yml/badge.svg)](https://github.com/yhlee52/ai_sci_cowork/actions/workflows/tests.yml)
 
-ML/DL 연구를 하는 작은 AI 연구 그룹을 Claude Code의 agent, skill, hook으로 구성한 **재사용 가능한 환경**이다.
-연구원들은 교수님(사용자)과 랩미팅으로 아이디어를 주고받고, 문헌을 조사하고, 실험을 구현·실행·분석하고, 서로 비판한다. 교수님이 자율 탐색을 시키면 승인한 범위 안에서 **스스로 실험을 반복**하기도 한다 (지금 바로, 또는 자리를 비운 사이나 밤새). 실험은 **이 PC를 자동으로 탐색해 건 하드웨어 제약** 안에서 설계된다. 중요한 결정은 반드시 교수님이 내리고, 결과가 좋아졌는지는 **코드가 판정**한다. 회의·작업·탐색이 끝날 때마다 결정 사항과 실험 결과를 모은 **HTML 리포트**가 만들어진다. 연구 지식은 **ID로 찾아 필요한 것만 읽을 수 있는 지식베이스**에 쌓인다.
+ML/DL 연구를 하는 작은 AI 연구 그룹을 Claude Code의 agent, skill, hook으로 구성한 **재사용 가능한 환경**이다. 연구원들은 교수님(사용자)과 랩미팅으로 아이디어를 주고받고, 문헌을 조사하고, 실험을 구현·실행하고, 결과를 정리한다. 중요한 결정은 교수님이 내리고, 결과가 좋아졌는지는 **코드가 판정**한다.
 
-- 이 저장소에는 **환경만** 들어 있다. 연구 결과물은 `/ai-lab:new-lab`으로 만드는 **별도 워크스페이스(별도 저장소)** 에 쌓인다.
+- 이 저장소에는 **환경만** 들어 있다. 연구 결과물은 `/ai-lab:new-lab`으로 만드는 **별도 연구실 폴더(별도 저장소)** 에 쌓인다.
 - **모든 산출물은 한글이다.** ID, JSON 필드 이름, 상태 값, 태그 같은 기계용 표기만 영어로 둔다.
 
-> 📖 **문서**
-> - [처음 읽는 안내서](docs/처음_읽는_안내서.md): AI agent 개념, 이 환경의 구조, GitHub 관리 방법 (처음이라면 여기부터)
-> - [사용설명서](docs/사용설명서.md): 설치, 첫 연구실, 첫 주기 따라 하기, 하드웨어 제약, 자율 탐색, 명령어 사전, 문제 해결
-> - [설계 근거](docs/설계_근거.md): 다른 AI scientist 시스템과 그 실패 연구에서 배운 것, 그래서 이렇게 만든 이유
+## 원칙
 
-## 세 가지 원칙
-
-1. **방향은 사람이, 숫자는 코드가 정한다.** AI는 제안하고 구현한다. 결과 비교(Welch t 신뢰구간), 캠페인의 채택/기각, 사전 등록 지키기, 증거 감사는 코드가 한다. AI의 자기 평가는 개선이 없어도 개선됐다고 착각한다는 연구 결과가 있다.
-2. **모든 주장은 추적 가능하다.** 주장 → 결과(F-) → 결과 파일 → 실행 기록, 인용 → 실존 확인된 논문(P-). 보고서의 숫자는 결과 파일과 자동 대조되고, 출처를 찾을 수 없는 숫자가 있으면 감사가 실패한다.
-3. **정직한 실패도 성공이다.** 실패, 효과 없음, 부정적 결과도 지식으로 기록한다. 끝내야 한다는 압박을 없애야 날조가 줄어든다.
-
-## 연구팀
-
-기록에는 `이름(역할)`으로 함께 적는다 (예: `엄서윤(비평 연구원)`).
-
-| 이름 | 역할 | 하는 일 | 구현 방식 |
-|---|---|---|---|
-| 교수님 | 사용자 | 방향 설정과 중요 결정(C 등급) | — |
-| 주현서 | 수석연구원 | 회의 진행 | 메인 세션 |
-| 이로운 | 이론 연구원 | 가설을 숫자 예측으로 날카롭게, 좋은 결과에는 경쟁 설명과 그것을 가르는 조건 이동 점검 | 회의에서는 메인 세션, 분석은 `theorist` |
-| 문하람 | 문헌 연구원 | 문헌 조사(arXiv·Semantic Scholar API), 선행연구 충돌 확인, 인용 검증 | `scout` (병렬 가능) |
-| 구민재 | 연구 엔지니어 | 구현·실험 (재현 → 기준선 → 파일럿 → 본 실험 → 절제 → 조건 이동 점검), 자동 탐색한 하드웨어 제약 안에서. 교수님이 시키면 승인된 캠페인 안에서 시도 반복 (판정은 `lab.py`) | `engineer`, `explorer` |
-| 진예준 | 검증 연구원 | 본 실험 전에 코드를 직접 돌려 점검: 계획-코드 일치, 평가 데이터 분리, 누수, 라벨 섞기·작은 배치 과적합·시드 점검 | `verifier` (effort high) |
-| 엄서윤 | 비평 연구원 | 비평 (Reviewer 2): 코드·로그·감사 결과까지 확인, 쌍대 비교 판정 | `critic` (effort high, 병렬 판정자) |
-| 한지우 | 작성 연구원 | 분석·보고서·논문 (모든 숫자와 인용이 추적 가능하게) | `writer` |
-| 추다인 | 요약 연구원 | 논문 한 편 깊이 읽기, 교수님용 한 쪽 요약, 초안·릴리스를 독립적으로 거꾸로 읽어 과장 잡기 | `summarizer` (논문마다 병렬) |
-| (관점별) | 아이디어 발상가들 | 서로 다른 관점(lens)으로 독립적으로 아이디어 생성 | `ideator` × N (병렬) |
-| 기다온 | 기록 담당 | 세션 기록을 지식베이스로 정리, 실패한 방향·실험 전략을 기억으로 증류 | `archivist` |
+1. **방향은 사람이, 숫자는 코드가 정한다.** 결과 비교(Welch t 신뢰구간), 캠페인의 채택·기각, 사전 등록 지키기, 보고서 숫자 감사는 코드가 한다.
+2. **모든 주장은 추적 가능하다.** 주장 → 결과(F-) → 결과 파일, 인용 → 실존 확인된 논문(P-).
+3. **정직한 실패도 성공이다.** 실패와 효과 없음도 지식으로 기록한다.
+4. **검증은 기본은 가볍게, 필요할 때 깊게.** 코드 감사는 늘 하고(토큰이 들지 않는다), AI 연구원의 검토는 교수님이 요청할 때만 한다 (`/ai-lab:review`).
 
 ## 설치
-
-아래 두 명령을 한 번만 실행한다. GitHub에서 바로 받아 오므로 어느 PC에서나 같다.
 
 ```
 # 터미널 CLI 대화창
@@ -51,105 +26,53 @@ claude plugin marketplace add yhlee52/ai_sci_cowork
 claude plugin install ai-lab@ai-sci-cowork
 ```
 
-GitHub에 새 버전이 올라가면 `claude plugin marketplace update ai-sci-cowork` 후 `claude plugin update ai-lab@ai-sci-cowork`(CLI 대화창에서는 `/plugin marketplace update ai-sci-cowork`)로 받아 온다. `claude`가 PATH에 없으면 VSCode 확장에 들어 있는 `claude.exe`를 쓴다 ([사용설명서 3장](docs/사용설명서.md#3-설치하기)).
+새 버전은 `claude plugin marketplace update ai-sci-cowork` 후 `claude plugin update ai-lab@ai-sci-cowork`로 받는다. 자세한 것은 [사용설명서 3장](docs/사용설명서.md#3-설치하기).
 
-## 사용법
+## 빠른 시작
 
-```
-/ai-lab:new-lab D:\research\my-first-lab 작은 모델의 일반화 현상
-```
-→ 새 폴더(git 저장소)가 생긴다. **그 폴더를 열고 새 세션을 시작한 뒤, 처음 한 번 뜨는 신뢰(trust) 확인을 승인한다.** 세션 시작 hook이 장기·중기·단기 컨텍스트, 결정 대기 항목, 캠페인 상황, 점검 경고를 자동으로 불러온다.
+1. `/ai-lab:new-lab D:\research\my-lab 작은 모델의 일반화` → 새 연구실 폴더가 생긴다.
+2. 그 폴더를 열고 새 세션을 시작한다 (처음 한 번 뜨는 신뢰 확인을 승인). 연구실 상태가 자동으로 불러와진다.
+3. `/ai-lab:lab-meeting plan` → 교수님과 연구 방향과 첫 목표를 정한다.
+4. 그다음은 **말로 시키면 된다** ("EXP-001 파일럿 돌려 줘", "관련 논문 찾아 줘"). 정해 둔 할 일을 한꺼번에 맡길 때는 `/ai-lab:work`.
+5. 세션을 마칠 때 `/ai-lab:archive`.
 
-| 명령 | 하는 일 |
-|---|---|
-| `/ai-lab:lab-meeting plan` | 주기 계획. 로드맵과 연구 지도를 보고 이번 주기의 목표, 약속, 성공·중단 기준, 예산을 교수님과 정한다 |
-| `/ai-lab:lab-meeting progress` | 짧은 진행 점검 |
-| `/ai-lab:lab-meeting review` | 결과 리뷰. 감사 결과와 리뷰를 보고 교수님이 확정·잠정·추가 실험·기각을 결정한다 |
-| `/ai-lab:lab-meeting journal <P-/LIT id>` | 논문 읽기 모임 |
-| `/ai-lab:lab-meeting retro` | 주기 회고. 교훈, 로드맵 변경 제안, **운영 방식 점검** |
-| `/ai-lab:lab-meeting 1on1 <역할>` | 교수님과 연구원 한 명의 1:1 |
-| `/ai-lab:brainstorm <주제>` | 병렬 독립 생성 → 선행연구 충돌 확인(병렬) → **쌍대 비교 순위**(판정자 여러 명) → 개선 → (파일럿 토너먼트) → 교수님 선택 |
-| `/ai-lab:work [A-001 …]` | 할 일을 담당 agent에게 맡긴다. 파일럿은 자율 → 코드 검증·계획 리뷰(병렬) → 본 실험과 결정은 교수님 |
-| `/ai-lab:campaign [EXP-id] \| plan\|run\|status\|stop` | **자율 탐색 캠페인**: "자율 탐색해"라고 하면 계약 → 승인 → 바로 시작. 승인된 계약 안에서 시도 반복, 판정은 코드, 끝나면 새 시드 확인 실험 |
-| `/ai-lab:paper <F-id들>` | 확정된 결과로 한글 논문·보고서 초안 → 숫자·인용 감사 → 학회식 리뷰 + 초안 거꾸로 읽기(병렬) → 수정 |
-| `/ai-lab:summarize <대상> [독자]` | 요약 연구원: 논문 깊이 읽기(논문마다 병렬), 실험·캠페인·세션·주기의 한 쪽 요약, 초안 거꾸로 읽기 |
-| `/ai-lab:archive` | 세션 정리: 지식베이스·요약본·연구 지도 갱신, 점검, 인계 메모, 로컬 git 커밋 |
-| `/ai-lab:release <F-/EXP-/CMP- id>` | 회사로 가져갈 **md 문서** (근거, 한계, 사용 방법, 선택적 코드 묶음) |
-| `/ai-lab:lab-status` | 현재 상황을 싸게 요약한다 |
-
-**운영 리듬:** 주기 = 세션 N개(기본 3). `plan 회의 → [세션마다: progress · brainstorm · work · campaign · review → archive] × N → retro 회의`
-
-## 의사결정 규칙 (연구가 산으로 가지 않게)
-
-| 등급 | 예 | 누가 |
-|---|---|---|
-| A. 자율 | 구현, 디버깅, 승인된 계획 안의 하이퍼파라미터, **파일럿**, 문헌 검색, **승인된 캠페인 안의 시도** | 담당 연구원 |
-| B. 동료 협의 | 승인된 계획 안의 설계 변경, 애매한 결과 해석 | 연구원 + 다른 연구원(주로 비평가) |
-| C. 교수님 결정 | 새 방향, **본 실험 착수**, **캠페인 계약**, 가설 폐기, **결과 확정**, 예산 초과, 로드맵 변경, 모순, 애매한 지시 | 교수님 |
-
-C 등급은 선택지와 함께 바로 여쭙고 기다린다. 교수님이 자리에 없으면(또는 캠페인이 도는 중이면) 결정 대기함(`lab.py inbox`)에 올리고, 다음 세션 시작 때 가장 먼저 보여 드린다.
-
-## 자율 탐색 (캠페인)
-
-[Karpathy의 autoresearch](https://github.com/karpathy/autoresearch)처럼 고정 시간(기본 5분) 실험을 반복하되, 연구실의 안전장치를 붙였다. 시간대와 상관없이 교수님이 시키면 시작한다 (바로 돌려서 지켜보거나, 자리를 비운 사이·밤새 맡기거나).
-
-- 교수님이 **계약**(지표, 수정 가능 파일, 예산, 멈춤 조건)을 승인한 범위 안에서만 자율.
-- 평가 코드는 **해시로 보호**, 지표는 평가 출력에서만 읽음 → 학습 코드가 지표를 속일 수 없다.
-- 채택 문턱 = 기준선 반복 측정의 잡음 × 2 → 우연한 개선을 채택하지 않는다. 같은 성능이면 더 짧은 코드를 채택한다.
-- 모든 시도는 장부·패치·로그로 남고, `lab.py verify`가 **장부의 숫자와 판정을 로그에서 다시 계산**해 위조를 잡는다.
-- 끝나면 **탐색에 쓰지 않은 새 시드**로 확인 실험 → 요약·리뷰 → 교수님 결정.
-- 오래 맡길 때는 Claude Code의 `/goal`로 시작하면 사용 한도에 걸려도 풀린 뒤 자동으로 이어 간다.
-
-## `lab.py` — 결정적 도구 (판정과 기록은 코드가)
+## 명령
 
 | 명령 | 하는 일 |
 |---|---|
-| `status`, `find/show/context/history`, `digest`, `map` | 현황, ID 검색, 1쪽 지식 요약(실패한 방향·효과 없음 포함), 연구 지도(mermaid) |
-| `approve <EXP>` | 교수님의 본 실험 승인 기록: plan.md의 지문과 시각 → `prereg.json`. 이 기록이 없으면 labkit이 본 실험을 막고, 승인 뒤 plan.md가 바뀌면 감사가 실패 |
-| `audit <EXP/CMP>`, `audit --report <문서> --sources <ID들>` | 결과↔실행 기록 대조, 사전 등록 준수(승인 뒤 실행, 계획 변경 없음), 보고서·논문의 숫자(한국어 조사가 붙어도)와 인용 대조 |
-| `campaign init/baseline/approve/begin/run/status/confirm/stop/close` | 캠페인 엔진: 실행, 시간 제한, 지표 판독, 채택/기각, 확인 실험 |
-| `rank schedule/score` | 쌍대 비교 순위 (Bradley-Terry, 판정자 여러 명의 판정 합산) |
-| `lit search/get/check` | arXiv·Semantic Scholar 검색, 논문 조회, 논문 항목 실존 확인 |
-| `lint`, `doctor` | 지식베이스 무결성 점검, 실험 환경 진단 |
-| `report` | 세션·실험·캠페인의 결정, 결과, 그래프를 모은 **HTML 리포트** (`reports/`). 회의·작업·캠페인·세션 정리 뒤에 자동 생성, 숫자는 모두 결과 파일에서 |
-| `hardware` | 이 PC의 하드웨어(GPU, VRAM, RAM, CPU) 탐색 → 운영 제약(`compute.limits`) 자동 설정. PC가 바뀌면 세션 시작 때 다시 탐색 |
-| `action`, `inbox`, `next`, `init`, `pack-md/unpack-md` | 할 일, 결정 대기함, ID 발급, 새 연구실, md 코드 묶음 |
+| `/ai-lab:lab-meeting [plan\|review\|journal\|retro\|1on1]` | 랩미팅: 방향 정하기, 결과 리뷰, 논문 읽기, 회고, 1:1 |
+| `/ai-lab:work [A-id…]` | 할 일을 담당 연구원에게 맡긴다. 파일럿은 자율, 본 실험과 결과 확정은 교수님 |
+| `/ai-lab:review <ID> [초점]` | **엄격 검증** (요청할 때만): 코드를 직접 돌려 보는 검증, 설계·통계·주장 비평, 메커니즘 분석 |
+| `/ai-lab:brainstorm <주제>` | 여러 관점의 독립 아이디어 → 선행연구 확인 → 쌍대 비교 순위 → 교수님 선택 |
+| `/ai-lab:campaign [EXP-id]` | 자율 탐색: 교수님이 승인한 범위 안에서 시도 반복, 판정은 코드, 끝나면 새 시드 확인 실험 |
+| `/ai-lab:paper <F-id…>` | 확정된 결과로 한글 논문·보고서 초안, 숫자·인용 감사 |
+| `/ai-lab:summarize <대상>` | 논문 깊이 읽기, 실험·세션의 한 쪽 요약 |
+| `/ai-lab:release <ID…>` | 회사로 가져갈 **md 문서** (근거, 한계, 사용 방법, 선택적 코드 묶음) |
+| `/ai-lab:archive` | 세션 정리: 지식베이스, 인계 메모, 점검, HTML 리포트, 로컬 git 커밋 |
+| `/ai-lab:lab-status` | 지금 상황 요약 |
+| `/ai-lab:new-lab <경로> [주제]` | 새 연구실 만들기 |
 
-## 장기·단기 컨텍스트와 지식베이스
+## 문서
 
-| 층 | 파일 | 세션 시작 때 |
-|---|---|---|
-| 헌장 | `LAB.md` (원칙, 결정 규칙, 연구 생애주기) | 필요할 때만 |
-| 장기 | `ROADMAP.md` (프로그램, 마일스톤) | 요약만 주입 |
-| 중기 | `state/cycle.md` (주기 목표, 약속, 예산) | 주입 |
-| 단기 | `state/lab_state.md` (인계 메모) | 주입 |
-| 지식 | `kb/digest.md`, `kb/map.md` → `lab.py find/show/context/history` | 필요할 때 |
-
-지식베이스는 [novel_project](https://github.com/yhlee52/novel_project)의 정본 관리 방식을 연구 지식에 적용했다: 사실 하나는 파일 하나가 소유, 현재 상태와 변화 기록(세션 로그) 분리, 작은 파일로 나누기, 색인은 캐시.
-
-## 토큰 절약 설계
-
-1. 회의는 한 컨텍스트에서 여러 관점으로 진행하고, 병렬 agent는 독립성이 품질을 올리는 곳에만 쓴다: 브레인스토밍 생성, 선행연구 확인, 쌍대 판정, 같은 대상에 대한 서로 다른 점검(검증+비평, 비평+이론, 리뷰+거꾸로 읽기), 논문별 요약.
-2. 세션 시작 주입은 약 40줄, 나머지는 ID로 필요할 때만 읽는다. subagent는 40줄 이하의 brief만 읽고 10줄 이하로 보고한다.
-3. 기계적인 일(ID, 검색, 감사, 캠페인 판정, 요약본, 지도)은 `lab.py`가 한다. 공용 코드 `labkit`을 재사용한다.
-4. 예산 프로필(`economy`/`standard`/`deep`)로 회의 라운드, 리뷰 횟수, 병렬 agent 수, 브레인스토밍 인원, 파일럿 토너먼트, 캠페인 배치 크기가 함께 바뀐다.
-5. agent와 skill의 내부 지시문만 영어로 쓴다(토큰이 적게 든다). 산출물은 모두 한글이다.
+- [사용설명서](docs/사용설명서.md): 설치, 첫 연구실, 따라 하기, 명령어 사전, 결정 규칙, 실험과 검증, 자율 탐색, 릴리스, 설정, 문제 해결
+- [처음 읽는 안내서](docs/처음_읽는_안내서.md): AI agent가 처음인 분을 위한 개념 설명과 GitHub 관리 방법
+- [설계 근거](docs/설계_근거.md): 다른 AI scientist 시스템과 그 실패 연구에서 배운 것, 그래서 이렇게 만든 이유
+- [변경 이력](CHANGELOG.md)
 
 ## 저장소 구조
 
 ```
-.claude-plugin/     plugin.json, marketplace.json
-agents/             scout, engineer, explorer, verifier, theorist, critic, writer, summarizer, ideator, archivist
-skills/             lab-meeting, brainstorm, work, campaign, paper, summarize, archive, release, lab-status, new-lab
-hooks/hooks.json    SessionStart → lab.py status --hook
-scripts/lab.py      연구실 도구 (Python 표준 라이브러리만 사용)
+.claude-plugin/       plugin.json, marketplace.json
+agents/               연구원 10명 (scout, engineer, explorer, verifier, theorist, critic, writer, summarizer, ideator, archivist)
+skills/               명령 11개 (위 표)
+hooks/hooks.json      세션 시작 → lab.py status --hook
+scripts/lab.py        연구실 도구 (Python 표준 라이브러리만 사용)
 templates/workspace/  새 연구실 템플릿 (LAB.md, ROADMAP.md, team.md, state/, kb/, labkit/, research/)
-tests/              lab.py·labkit 테스트 (python -m unittest discover -s tests)
-.github/workflows/  GitHub Actions: Windows·Linux × Python 3.10·3.13 자동 테스트
-docs/               처음 읽는 안내서, 사용설명서, 설계 근거
+tests/                lab.py·labkit 테스트 (python -m unittest discover -s tests)
+docs/                 사용설명서, 처음 읽는 안내서, 설계 근거
 ```
 
 ## 요구 사항
 - Python 3.10 이상 (`python`이 PATH에 있어야 한다), git, [uv](https://docs.astral.sh/uv/)
-- 실험용 torch는 첫 실험 때 engineer가 워크스페이스에 설치한다 (CUDA 12.8 wheel, Python 3.11–3.13)
+- 실험용 torch는 첫 실험 때 연구 엔지니어가 연구실에 설치한다 (CUDA 12.8 wheel, Python 3.11–3.13)
 - Claude Code v2.1.269 이상 권장 (`/goal`의 사용 한도 자동 재개)

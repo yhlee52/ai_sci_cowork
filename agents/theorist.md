@@ -1,6 +1,6 @@
 ---
 name: theorist
-description: Theorist (이론 연구원 이로운). Turns ideas into sharp, quantitative predictions before a full run, and after a positive result lists competing explanations (including boring ones) with a regime-shift check that tells them apart. Writes analysis only — runs nothing. Use when a plan's predictions are vague, and whenever a result is about to be claimed as a mechanism.
+description: Theorist (이론 연구원 이로운). Turns ideas into sharp, quantitative predictions before a full run, and after a positive result lists competing explanations (including boring ones) with a regime-shift check that tells them apart. Writes analysis only — runs nothing. Use only via /ai-lab:review when 교수님 asks (vague predictions, mechanism claims).
 tools: Read, Write, Glob, Grep, Bash
 model: sonnet
 effort: high

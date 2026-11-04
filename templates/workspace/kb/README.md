@@ -37,8 +37,7 @@
 | 사명, 연구 방향, 원칙, 의사결정 규칙 | `LAB.md` | — |
 | 팀의 역할과 관점 | `team.md` | — |
 | 장기 계획: 연구 프로그램, 마일스톤 | `ROADMAP.md` | PR-n, MS-n |
-| 이번 주기의 목표, 약속, 예산 | `state/cycle.md` | — |
-| 지금 상태와 인계 메모 | `state/lab_state.md` (40줄 이하) | — |
+| 이번 목표, 지금 상태, 인계 메모 | `state/lab_state.md` (40줄 이하) | — |
 | 교수님 결정을 기다리는 질문 | `state/inbox.json` (`lab.py inbox`) | ASK- |
 | 세션에서 일어난 일과 모든 상태 변화 | `kb/log/session_NNN.json` | S-NNN |
 | 세션의 논의 원본 | `meetings/session_NNN.md` | — |
@@ -57,9 +56,9 @@
 | 브레인스토밍 (관점별 아이디어, 점수, 최종 후보) | `research/brainstorms/BS-NNN/` (summary.md) | BS- |
 | 실험 (계획, 승인 기록 `prereg.json`, 코드, 결과, 보고서, 이론 분석 `theory.md`) | `research/experiments/EXP-NNN-*/` | EXP- |
 | 자율 탐색 캠페인 (계약, 장부, 시도별 변경·로그, 확인 실험) | `research/campaigns/CMP-NNN-*/` (campaign.md) | CMP- |
-| 리뷰 (비평 연구원의 리뷰, 검증 연구원의 코드 검증) | `research/reviews/REV-NNN.md` | REV- |
+| 리뷰 (엄격 검증: 비평 연구원의 리뷰, 검증 연구원의 코드 검증) | `research/reviews/REV-NNN.md` | REV- |
 | 요약 (논문 깊이 읽기, 교수님용 한 쪽 요약, 초안 거꾸로 읽기) | `research/summaries/SUM-NNN-*.md` | SUM- |
-| 과업 지시서 | `briefs/TASK-NNN.md` | TASK- |
+| 작업 지시서 (할 일 ID로 이름을 붙인다) | `briefs/A-NNN.md` | — |
 | 회사로 가져갈 릴리스 (md 파일만: 본문 + 선택적 코드 묶음) | `research/releases/REL-NNN-*/` (REL-NNN-*.md) | REL- |
 
 ## 모든 항목의 공통 필드 (JSON)
@@ -76,7 +75,7 @@
 |---|---|---|
 | 질문 `Q-` | `question`, `motivation`, `scope` | `open`(열림), `narrowed`(좁혀짐), `answered`(답변됨), `dropped`(중단됨) |
 | 가설 `H-` | `statement`(반증 가능한 문장), `prediction`(어떤 결과면 반박되는가), `question`(Q- id) | `proposed`(제안됨), `testing`(검증 중), `supported`(지지됨), `refuted`(반박됨), `inconclusive`(결론 없음), `abandoned`(폐기됨) |
-| 결과 `F-` | `statement`, `result_type`(`positive`/`null`/`negative` — 효과 없음도 결과다), `evidence`[경로/ID], `conditions`(성립하는 조건), `scope_limits`(검증하지 않은 범위), `regime_shift_checked`(조건 이동 점검 여부), `confidence` `low/medium/high`, `supports`/`refutes`[H id], `decided_by`(`accepted`는 반드시 `교수님`) | `provisional`(잠정), `accepted`(확정), `superseded`(대체됨, `superseded_by` 기록) |
+| 결과 `F-` | `statement`, `result_type`(`positive`/`null`/`negative` — 효과 없음도 결과다), `evidence`[경로/ID], `conditions`(성립하는 조건), `scope_limits`(검증하지 않은 범위), `regime_shift_checked`(조건 이동 점검 여부), `review_level`(`audit` 코드 감사만 / `strict` 엄격 검증까지), `confidence` `low/medium/high`, `supports`/`refutes`[H id], `decided_by`(`accepted`는 반드시 `교수님`) | `provisional`(잠정), `accepted`(확정), `superseded`(대체됨, `superseded_by` 기록) |
 | 결정 `D-` | `decision`, `reason`, `alternatives`, `dissent`[{who, view}], `class`(A/B/C), `decided_by` | `in_force`(유효), `revised`(수정됨), `revoked`(철회됨) |
 | 논문 `P-` | `authors`, `year`, `venue`, `url`, `arxiv`, `takeaway`(한 줄), `relevance`, `license`(있다면), `cited_in`[LIT id] | `skimmed`(훑어봄), `read`(읽음), `key`(핵심) |
 | 데이터셋 `DS-` | `source`, `url`, `size`, `splits`, `license`(회사 사용 가능 여부 포함), `loader`(코드 경로) | `candidate`(후보), `in_use`(사용 중), `retired`(사용 종료) |

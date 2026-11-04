@@ -1,6 +1,6 @@
 ---
 name: writer
-description: Analyst and writer (작성 연구원 한지우). Turns results.json / campaign ledgers into figures and honest, audited reports, and drafts papers or summaries for 교수님 in which every number and citation is traceable. Use after an experiment or campaign completes, or when a written deliverable is needed in an ai-lab workspace.
+description: Analyst and writer (작성 연구원 한지우). Turns results.json / campaign ledgers into figures and honest, audited reports, and drafts papers or summaries for 교수님 in which every number and citation is traceable. Use for campaign summaries, papers, and longer write-ups 교수님 asks for in an ai-lab workspace (the engineer writes the short report of a full run).
 tools: Read, Write, Edit, Glob, Grep, Bash, PowerShell
 model: sonnet
 effort: medium

@@ -1,15 +1,15 @@
 ---
 name: brainstorm
-description: Multi-agent brainstorm in an ai-lab workspace — several ideator subagents with different lenses generate ideas independently and in parallel; the ideas are merged, checked for prior-art collisions, ranked by pairwise comparison, refined, optionally piloted, and the shortlist is brought to 교수님 to decide. Use when the lab needs new research ideas or hypotheses on a topic.
+description: Multi-agent brainstorm in an ai-lab workspace — several ideator subagents with different lenses generate ideas independently and in parallel; the ideas are merged, checked for prior-art collisions, ranked by pairwise comparison, refined, and the shortlist is brought to 교수님 to decide. Use when the lab needs new research ideas or hypotheses on a topic.
 argument-hint: "<topic or question> [lenses: theory,empirical,...]"
 ---
 
-# Brainstorm (generate → merge → prior-art check → pairwise rank → refine → pilot → 교수님 decides)
+# Brainstorm (generate → merge → prior-art check → pairwise rank → refine → 교수님 decides)
 
-Design (from the co-scientist / ideation literature): independent parallel generation keeps ideas diverse; ideas are compared **in pairs** (absolute LLM scores are poorly calibrated); prior art is checked with real bibliographic search; and because ideas look better on paper than after execution, the top candidates can get a 2-minute **pilot** before 교수님 chooses. Tool: `python "${CLAUDE_PLUGIN_ROOT}/scripts/lab.py"`.
+Design (from the co-scientist / ideation literature): independent parallel generation keeps ideas diverse; ideas are compared **in pairs** (absolute LLM scores are poorly calibrated); prior art is checked with real bibliographic search; and because ideas look better on paper than after execution, 교수님 can ask for a 2-minute **pilot** of the top candidates before choosing. Tool: `python "${CLAUDE_PLUGIN_ROOT}/scripts/lab.py"`.
 
 ## 0. Setup
-1. Profile from `lab.config.json`: `brainstorm_agents` (N), `ideas_per_agent`, `rank_judges` (J), `max_parallel_agents`, `pilot_tournament`, compute budget. Lenses: those named in `$ARGUMENTS`, else the first N rows of the lens table in `team.md`.
+1. Profile from `lab.config.json`: `brainstorm_agents` (N), `ideas_per_agent`, `rank_judges` (J), `max_parallel_agents`, compute budget. Lenses: those named in `$ARGUMENTS`, else the first N rows of the lens table in `team.md`.
 2. `lab.py next brainstorm` → `BS-xxx`; create `research/brainstorms/BS-xxx/`.
 3. Write `brief.md` there (≤40 lines, Korean): topic, goal chain (ROADMAP milestone → Q-/H-), constraints (the hardware limits from `lab.config.json → compute.limits` in one line, pilot ≤2 min, full-run budget), **what the lab already knows** and **what already failed** — from `kb/digest.md` ("실패한 방향", "효과 없음" sections) and 1–3 `lab.py find` queries, as one-liners with ids.
 
@@ -26,9 +26,9 @@ Split the candidates into up to `max_parallel_agents` groups and launch one scou
 For judge j = 1…J: `lab.py rank schedule C1 C2 … Ck --seed <j>` (each judge gets a different order and left/right placement — LLM judges favour one position) → that list in judge j's brief; launch all J critics **in one message**, each writing `research/brainstorms/BS-xxx/pairs-<j>.md` with one `Cx > Cy | 이유` line per pair (each also sees scoop.md, not the other judges' files). Then `lab.py rank score --file …/pairs-1.md [--file …/pairs-2.md …]` → ranking table (deterministic Bradley-Terry over all judges' games) and how many pairs the judges split on. Save it to `ranking.md`; pairs the judges split on are genuinely close — say so to 교수님.
 
 ## 5. Refine the top 3 (you)
-One improvement pass per top candidate: fix the critic's main objection, simplify, or combine complementary candidates. Don't invent new directions here. In the `standard`/`deep` profiles, launch `ai-lab:theorist` (mode `predict`) for the top 2 **in parallel** to make each hypothesis and kill criterion quantitative.
+One improvement pass per top candidate: fix the critic's main objection, simplify, or combine complementary candidates; make each hypothesis and kill criterion as quantitative as you can. Don't invent new directions here.
 
-## 6. Pilot tournament (if `pilot_tournament` is on in the profile)
+## 6. Pilot tournament (only if 교수님 asks)
 For the top 2: an `ai-lab:engineer` pilot each (class A, ≤2 min, 1 seed, clearly labelled pilot). A pilot says only "code works / any signal / real cost", never "better".
 
 ## 7. Bring it to 교수님 — class C, wait for the answer

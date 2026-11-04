@@ -1,6 +1,6 @@
 ---
 name: paper
-description: Draft a Korean paper or technical report from the lab's findings in an ai-lab workspace — claims only from reviewed findings, numbers only from result files, citations only from verified paper entries — then audit it, have it reviewed like a conference submission, and revise once.
+description: Draft a Korean paper or technical report from the lab's findings in an ai-lab workspace — claims only from reviewed findings, numbers only from result files, citations only from verified paper entries — then audit it; a conference-style review only when 교수님 asks.
 argument-hint: "<F-ids or topic> [report|workshop]"
 disable-model-invocation: true
 ---
@@ -12,7 +12,7 @@ Every claim → a finding (F-) → its evidence (EXP/CMP result files); every nu
 ## 1. Gather (you)
 - Findings: the ids in `$ARGUMENTS`, or `lab.py find <topic> --type finding`. For each: `lab.py context <F-id>` (evidence, reviews, papers). Only `accepted` findings are claims; `provisional` ones may appear only labelled "잠정"; null/negative results that bound the claims belong in the paper too.
 - `lab.py lit check` must be clean for every paper you will cite.
-- Missing evidence (no review, audit fails, no regime-shift check for a mechanism claim) → list it; don't paper over it.
+- Missing evidence (audit fails, no regime-shift check for a mechanism claim) → list it; don't paper over it. Show each finding's `review_level` (audit / strict) so 교수님 can decide whether a strict review is wanted first.
 
 ## 2. Outline — class C, confirm with 교수님
 Show: working title, the 1–3 claims (with F-ids), what is explicitly **not** claimed, figure list, target form (`report` 기술 보고서 / `workshop` 4쪽 논문). Use AskUserQuestion (`이대로 진행` / `수정` / `보류`). Wait.
@@ -24,9 +24,8 @@ Show: working title, the 1–3 claims (with F-ids), what is explicitly **not** c
 ## 4. Audit (you)
 `lab.py audit --report research/papers/<slug>/paper.md --sources <EXP/CMP ids>` → fix every unknown number (실패) and missing citation; numbers from papers stay in sentences that cite their P- id.
 
-## 5. Review — in parallel, one message
-- `ai-lab:critic`, conference-style: REV with 요약, 강점, 약점, 질문, 재현 가능성, 주장-증거 일치, 점수 1–10과 근거. In the `deep` profile, two critics independently (methods vs. claims), merged.
-- `ai-lab:summarizer`, mode `reverse`: give it **only** the draft path (not the outline) → `SUM-xxx`. Compare its "실제로 하는 주장" with the claims 교수님 approved in §2: any claim that is stronger, missing, or new is a revision item.
+## 5. Report
+Tell 교수님 (≤8 lines): path, claims made, audit result, what remains weak, and the review level of the findings it rests on. Record in the minutes; status stays `draft` until 교수님 approves it.
 
-## 6. Revise once, then report
-Writer revises against the REV and the reverse-read gaps; re-run the audit. Tell 교수님 (≤8 lines): path, claims made, audit result, review verdict, what remains weak. Record in the minutes; status stays `draft` until 교수님 approves it.
+## 6. Review and revise (only if 교수님 asks)
+`/ai-lab:review research/papers/<slug>/paper.md` — a conference-style critic REV (요약, 강점, 약점, 질문, 재현 가능성, 주장-증거 일치, 점수 1–10) plus a summarizer reverse read given **only** the draft. Any claim stronger than, missing from, or new to the outline approved in §2 is a revision item; the writer revises once and the audit is re-run.

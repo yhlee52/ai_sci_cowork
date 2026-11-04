@@ -10,7 +10,7 @@ import html
 import math
 import re
 
-ID_PATTERN = re.compile(r"\b(?:IDEA|LIT|EXP|REV|TASK|ASK|REL|CMP|BS|DS|MS|H|F|Q|D|P|M|A|L|S)-\d{1,}\b")
+ID_PATTERN = re.compile(r"\b(?:IDEA|LIT|EXP|REV|ASK|REL|CMP|BS|DS|MS|H|F|Q|D|P|M|A|L|S)-\d{1,}\b")
 
 CSS = """
 :root{--bg:#f7f7f5;--card:#ffffff;--ink:#1f2328;--muted:#5f6670;--line:#e3e5e8;--accent:#2f6fde;

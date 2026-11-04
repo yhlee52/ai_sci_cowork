@@ -14,6 +14,7 @@ The lab runs outside the company. Only **.md files** can be brought inside, and 
 2. Check before proposing:
    - Findings should be `accepted`. `provisional` or pilot-only results go in only if 교수님 explicitly agrees, and are marked **"미확정"** everywhere.
    - `lab.py audit` PASS for each included experiment or campaign (for a campaign: confirmation on fresh seeds done).
+   - Each finding's `review_level`. Inside the company nobody can ask what was meant, so for `audit`-only findings offer `/ai-lab:review` once (one line); 교수님 decides.
    - Licenses of datasets, pretrained models and copied code (P-/DS-/M- entries): note whether **company use** is allowed. Unknown → flag it.
 3. Ask 교수님 and **wait**:
    - what goes in / what is left out, license flags, open caveats;
@@ -36,13 +37,13 @@ The lab runs outside the company. Only **.md files** can be brought inside, and 
 **`REL-xxx-<slug>-코드.md` — the code bundle** (only if approved):
 - Collect exactly the files needed to run: experiment `src/` + the `labkit` modules it imports + configs + a `requirements.txt` written with `uv export --format requirements-txt --no-hashes`. Rewrite imports/paths so the code runs from the bundle root, in a temporary staging folder (not in the lab's own sources).
 - Pack: `lab.py pack-md <staging paths> --root <staging> --out research/releases/REL-xxx-<slug>/REL-xxx-<slug>-코드.md --title "REL-xxx 코드 묶음"`. The bundle embeds its own restore script and a sha256 list.
-- **Round-trip test (mandatory):** `lab.py unpack-md <bundle> --out <temp dir>`, then in that temp dir `uv venv .rel-venv && uv pip install -r requirements.txt --python .rel-venv`, run the smallest command from `## 사용 방법`, confirm it works, then delete the temp dir.
+- **Round-trip check (mandatory, cheap):** `lab.py unpack-md <bundle> --out <temp dir>` restores every file with matching sha256; delete the temp dir. Installing and running the restored code (`uv venv` + the smallest command from `## 사용 방법`) only if 교수님 asks.
 
 Never include: `kb/`, `meetings/`, `briefs/`, agent memory, API keys/tokens, `.env`, absolute personal paths, data files.
 
 Before recording:
 - `lab.py audit --report <main .md> --sources <EXP/CMP ids>` must find no unknown numbers.
-- `ai-lab:summarizer`, mode `reverse`, audience 회사, given only the main .md: inside the company nobody can ask the lab what was meant, so any claim the reader would take away that is stronger than `## 적용 범위와 한계` allows, or any step of `## 사용 방법` it could not follow, is fixed before release.
+- Reread the main .md once yourself as a company reader: any claim stronger than `## 적용 범위와 한계` allows, or a step of `## 사용 방법` that can't be followed, is fixed. (An independent reverse read by the summarizer is part of `/ai-lab:review <path>`, on request.)
 
 ## 3. Record
 - Append to the current `meetings/session_NNN.md` under `## 릴리스`: REL id, included ids, whether code was bundled, 교수님's approval, caveats. The archivist files it.

@@ -14,7 +14,6 @@ agent가 필요한 것만 읽도록 돕는다. 모든 출력은 한글이다.
   lab.py show <ID>                     항목 하나 보기
   lab.py context <ID>                  항목 + 참조하는/참조되는 항목의 한 줄 요약
   lab.py history <ID>                  세션 로그에서 그 항목이 바뀐 이력
-  lab.py verify <EXP-id>               실험 감사: 사전 등록 + results.json이 실행 기록과 일치하는지
   lab.py approve <EXP-id> [--note 말씀]  교수님의 본 실험 승인 기록 (plan.md 지문 → prereg.json, 이후 변경은 감사 실패)
   lab.py digest                        kb/digest.md 다시 만들기 (연구실이 아는 것 1쪽)
   lab.py pack-md <경로들> --out 묶음.md  코드 파일들을 복원 가능한 md 하나로 묶기 (회사로는 md만 가져갈 수 있다)
@@ -22,7 +21,7 @@ agent가 필요한 것만 읽도록 돕는다. 모든 출력은 한글이다.
   lab.py campaign init|approve|baseline|begin|run|status|confirm|stop   자율 탐색 캠페인 (판정은 코드가)
   lab.py rank schedule C1 C2 ... [--seed n] / rank score --file 판정1.md [--file 판정2.md]   쌍대 비교 순위 (판정자 여러 명 합산)
   lab.py lit search|get|check           문헌 검색, 논문 조회, 논문 항목의 실존 확인 (arXiv, Semantic Scholar)
-  lab.py audit <EXP-id|CMP-id>          검증 + 계획 대조 + 보고서 숫자 대조
+  lab.py audit <EXP-id|CMP-id>          코드 감사: 실행 기록 대조 + 사전 등록 + 보고서 숫자 대조 (기본 검증)
   lab.py lint                           지식베이스 무결성 점검
   lab.py doctor [--torch]               실험 환경 진단
   lab.py map                            연구 지도(mermaid) 만들기 → kb/map.md
@@ -66,7 +65,6 @@ CONFIG = "lab.config.json"
 KINDS = {
     "session": ("", None),
     "action": ("A-", None),
-    "task": ("TASK-", "task"),
     "idea": ("IDEA-", "idea"),
     "lit": ("LIT-", "lit"),
     "exp": ("EXP-", "experiment"),
@@ -101,7 +99,6 @@ ARTIFACT_GLOBS = {
     "idea": "research/ideas/IDEA-*.md",
     "lit": "research/literature/LIT-*.md",
     "review": "research/reviews/REV-*.md",
-    "task": "briefs/TASK-*.md",
     "experiment": "research/experiments/EXP-*",
     "brainstorm": "research/brainstorms/BS-*",
     "release": "research/releases/REL-*",
@@ -109,7 +106,7 @@ ARTIFACT_GLOBS = {
     "summary": "research/summaries/SUM-*.md",
 }
 DIR_SUMMARY = ("plan.md", "campaign.md", "summary.md", "report.md", "README.md")
-ID_RE = re.compile(r"\b(?:IDEA|LIT|EXP|REV|TASK|ASK|REL|CMP|SUM|BS|DS|H|F|Q|D|P|M|A|L)-\d{3,}\b")
+ID_RE = re.compile(r"\b(?:IDEA|LIT|EXP|REV|ASK|REL|CMP|SUM|BS|DS|H|F|Q|D|P|M|A|L)-\d{3,}\b")
 PREREG_KEYS = {  # 본 실험 전에 plan.md 제목(#)에 각 묶음의 단어가 하나씩 있어야 한다
     "예측": ("예측", "prediction"),
     "성공 기준": ("성공 기준", "success"),
@@ -121,7 +118,7 @@ TEXT_SUFFIXES = {".md", ".json", ".txt", ".toml", ""}
 TYPE_KO = {
     "hypothesis": "가설", "finding": "결과", "question": "질문", "decision": "결정", "paper": "논문",
     "dataset": "데이터셋", "method": "방법", "lesson": "교훈", "idea": "아이디어", "lit": "문헌조사",
-    "experiment": "실험", "review": "리뷰", "task": "과업", "brainstorm": "브레인스토밍",
+    "experiment": "실험", "review": "리뷰", "brainstorm": "브레인스토밍",
     "release": "릴리스", "session": "세션", "campaign": "캠페인", "summary": "요약",
 }
 STATUS_KO = {
@@ -383,7 +380,7 @@ def cmd_init(args) -> None:
         sys.exit(f"오류: {dest} 폴더가 비어 있지 않습니다 (아무것도 지우지 않았습니다)")
     subs = {
         "{{LAB_NAME}}": args.name or dest.name,
-        "{{TOPIC}}": args.topic or "(미정 — 첫 주기 계획 회의에서 정한다)",
+        "{{TOPIC}}": args.topic or "(미정 — 첫 계획 회의에서 정한다)",
         "{{DATE}}": today(),
     }
     for src in TEMPLATE_DIR.rglob("*"):
@@ -424,26 +421,17 @@ def cmd_status(args) -> None:
     cfg = load_json(lab / CONFIG, {})
     counters = load_json(lab / "state" / "counters.json", {})
     session = counters.get("session", 0)
-    cyc = cycle_meta(lab)
-    cyc_txt = ""
-    if cyc:
-        done = max(0, session - cyc["start"] + 1) if session >= cyc["start"] else 0
-        cyc_txt = f", 주기 {cyc['cycle']}: 세션 {done}/{cyc['length']}"
-        if done >= cyc["length"]:
-            cyc_txt += " → 회고할 때입니다"
     out = [f"# 연구실: {cfg.get('lab_name', lab.name)}  (예산 프로필: {cfg.get('budget_profile', 'economy')}, "
-           f"마지막 세션: {session:03d}{cyc_txt})"]
+           f"마지막 세션: {session:03d})"]
     roadmap = lab / "ROADMAP.md"
     if roadmap.exists():
         summ = md_section(roadmap.read_text(encoding="utf-8"), "요약", 8)
         if summ:
             out.append("\n## 장기 (ROADMAP.md 요약)\n" + summ)
-    for label, rel_path, limit in (("중기 (state/cycle.md)", "state/cycle.md", 2500),
-                                   ("단기 (state/lab_state.md)", "state/lab_state.md", 3000)):
-        f = lab / rel_path
-        if f.exists():
-            text = "\n".join(ln for ln in f.read_text(encoding="utf-8").splitlines() if ln.strip())
-            out.append(f"\n## {label}\n" + (text if len(text) <= limit else text[:limit] + f"\n…(생략됨. {rel_path}를 읽으세요)"))
+    f, limit = lab / "state" / "lab_state.md", 3000
+    if f.exists():
+        text = "\n".join(ln for ln in f.read_text(encoding="utf-8").splitlines() if ln.strip())
+        out.append("\n## 지금 (state/lab_state.md)\n" + (text if len(text) <= limit else text[:limit] + "\n…(생략됨. state/lab_state.md를 읽으세요)"))
     asks = [q for q in load_json(lab / "state" / "inbox.json", []) if q.get("status") == "open"]
     if asks:
         out.append(f"\n## ⚠ 교수님 결정 대기 ({len(asks)}건) — 가장 먼저 여쭙는다")
@@ -501,25 +489,6 @@ def md_section(text: str, heading: str, max_lines: int) -> str:
     return "\n".join(lines[:max_lines])
 
 
-def cycle_meta(lab: Path) -> dict | None:
-    f = lab / "state" / "cycle.md"
-    if not f.exists():
-        return None
-    m = md_meta(f)
-    raw = {}
-    for ln in f.read_text(encoding="utf-8").splitlines()[:12]:
-        if ln.strip().startswith(">"):
-            for part in ln.lstrip("> ").split("|"):
-                if ":" in part:
-                    k, v = part.split(":", 1)
-                    raw[k.strip().lower()] = v.strip()
-    try:
-        return {"cycle": int(raw.get("cycle", 0)), "start": int(raw.get("start_session", 1)),
-                "length": int(raw.get("length", 3)), "title": m.get("title", "")}
-    except ValueError:
-        return None
-
-
 def cmd_inbox(args) -> None:
     """교수님만 정할 수 있는 질문. agent가 올리고, 메인 세션이 여쭙고 기록한다."""
     lab = need_lab(args)
@@ -560,22 +529,6 @@ def _inbox(lab: Path, args) -> None:
 def exp_dir(lab: Path, eid: str) -> Path | None:
     hits = [p for p in (lab / "research" / "experiments").glob(f"{eid}*") if p.is_dir()]
     return hits[0] if hits else None
-
-
-def cmd_verify(args) -> None:
-    """실험(EXP) 또는 캠페인(CMP) 하나의 증거를 결정적으로 감사한다."""
-    lab = need_lab(args)
-    if args.id.upper().startswith("CMP-"):
-        issues = campaign_verify(lab, campaign_dir(lab, args.id))
-    else:
-        d = exp_dir(lab, args.id)
-        if d is None:
-            sys.exit(f"오류: {args.id} 실험 폴더가 없습니다")
-        issues = verify_experiment(d)
-    fails = print_issues(issues)
-    print(f"검증 {args.id}: {'실패' if fails else '통과'} (실패 {fails}건)")
-    if fails:
-        sys.exit(1)
 
 
 def print_issues(issues: list[tuple[str, str]]) -> int:
@@ -2088,7 +2041,7 @@ def cmd_audit(args) -> None:
         if d is None:
             sys.exit(f"오류: {eid} 실험 폴더가 없습니다")
         issues = verify_experiment(d) + spec_check(d) + report_number_check(d)
-    issues.append(("정보", "사람(비평가)이 볼 것: 보고서의 방법 설명이 실제 코드와 같은지, 검증하지 않은 조건으로 일반화하지 않았는지"))
+    issues.append(("정보", f"코드 감사만 했습니다. 방법 설명과 코드의 일치, 일반화 범위까지 보려면 엄격 검증(/ai-lab:review {eid})"))
     fails = print_issues(issues)
     warns = sum(1 for lvl, _ in issues if lvl == "경고")
     print(f"감사 {eid}: {'실패' if fails else '통과'} (실패 {fails}건, 경고 {warns}건)")
@@ -2132,7 +2085,7 @@ def lint_issues(lab: Path) -> list[tuple[str, str]]:
             age = (today_d - dt.date.fromisoformat(a["created"])).days
             if age >= 21:
                 issues.append(("정보", f"{a['id']}: {age}일째 열린 할 일 — 계속할지 정리할지 정할 것"))
-    for relp, limit in (("state/lab_state.md", 40), ("state/cycle.md", 40), ("ROADMAP.md", 60), ("CLAUDE.md", 60)):
+    for relp, limit in (("state/lab_state.md", 40), ("ROADMAP.md", 60), ("CLAUDE.md", 60)):
         f = lab / relp
         if f.exists():
             n = len([ln for ln in f.read_text(encoding="utf-8").splitlines() if ln.strip()])
@@ -2732,7 +2685,6 @@ def main() -> None:
     p.add_argument("--from", dest="frm"); p.add_argument("--question"); p.add_argument("--options")
     p.add_argument("--ref"); p.add_argument("--context"); p.add_argument("--answer")
     p.add_argument("--all", action="store_true"); p.set_defaults(fn=cmd_inbox)
-    p = sub.add_parser("verify", help="실험 증거 감사"); p.add_argument("id"); p.set_defaults(fn=cmd_verify)
     p = sub.add_parser("approve", help="본 실험(사전 등록) 승인 기록 — 교수님 결정 뒤에만")
     p.add_argument("id"); p.add_argument("--note"); p.set_defaults(fn=cmd_approve)
     p = sub.add_parser("digest", help="지식 요약본 만들기"); p.set_defaults(fn=cmd_digest)

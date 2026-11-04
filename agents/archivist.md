@@ -23,7 +23,7 @@ Session number `NNN` and the `lab.py` command path. Use Bash only for `lab.py` (
 - `kb/log/session_NNN.json` — title, 3–5 line summary, tags, and events. Every entity you create or change gets an event with a `changes` item (`"target": "<ID>", "change": "created" | "status a → b" | "<field> updated"`).
 - Entities (JSON, UTF-8, `ensure_ascii=False`; all text values in Korean; schema per type in kb/README.md):
   - `Q-` research questions raised or narrowed; `H-` hypotheses proposed or re-statused (testing/supported/refuted…);
-  - `F-` findings — `provisional` when a full-run or confirmed campaign result passed review (REV accept/minor); `accepted` **only** if the minutes record 교수님 accepting it (`decided_by: "교수님"`). Set `result_type`: `positive` / `null` (no effect — CI includes 0, or a campaign found nothing better) / `negative` (worse). **Null and negative results are recorded as findings too** — they are what stops the lab from repeating dead ends. Pilot numbers and single-seed search results never become findings. Cite evidence paths, copy numbers exactly, fill `scope_limits` (untested regimes) and whether a regime-shift check was done.
+  - `F-` findings — `provisional` when a full-run or confirmed campaign result passed `lab.py audit`; set `review_level` to `strict` if a REV from `/ai-lab:review` (accept/minor) covers it, else `audit`; `accepted` **only** if the minutes record 교수님 accepting it (`decided_by: "교수님"`). Set `result_type`: `positive` / `null` (no effect — CI includes 0, or a campaign found nothing better) / `negative` (worse). **Null and negative results are recorded as findings too** — they are what stops the lab from repeating dead ends. Pilot numbers and single-seed search results never become findings. Cite evidence paths, copy numbers exactly, fill `scope_limits` (untested regimes) and whether a regime-shift check was done.
   - `D-` one per decision in the minutes, including dissent, class (A/B/C) and who decided (members as `이름(역할)`, e.g. `엄서윤(비평 연구원)`; 교수님 as `교수님`).
   - `DS-`/`M-` datasets and methods first used or improved (loader/impl code paths; prefer `labkit/` paths; for campaigns, the kept configuration as `known_good_hparams`).
   - `L-` lessons: failures, pitfalls, env quirks, process problems, and — from campaign `notes.md` — reusable experiment strategies (what consistently helped or hurt). Imperative one-liners with `applies_to` (e.g. `engineer`, `explorer`, `전체`). Skip one-off noise.
@@ -31,7 +31,7 @@ Session number `NNN` and the `lab.py` command path. Use Bash only for `lab.py` (
   - Summaries (`SUM-`), code-verification reviews and `theory.md` analyses are not KB entities: reference them in the session log events and in the `refs` of the entities they informed.
 - Keep `summary` to one line and `tags` to 2–5 lowercase keywords (reuse existing tags; check with `lab.py find --tag`).
 - If the record contradicts an existing entry, don't overwrite silently: update the entry's status (e.g. `superseded`, `superseded_by`) and log why.
-- Don't edit `ROADMAP.md`, `state/cycle.md`, or `state/inbox.json`.
+- Don't edit `ROADMAP.md` or `state/inbox.json`.
 - Finish with `lab.py index`, `lab.py digest`, `lab.py map`, then `lab.py lint` — fix every 실패/경고 you caused.
 
 ## Language

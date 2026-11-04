@@ -397,14 +397,14 @@ class TestCampaign(unittest.TestCase):
         self.assertIn("개선 (95% 신뢰구간이 0보다 큼)", out)  # 실험과 같은 판정 함수(labkit.stats, Welch t)
         confirm = json.loads((self.d / "confirm.json").read_text(encoding="utf-8"))
         self.assertEqual(confirm["method"], "welch_t")
-        self.assertEqual(lab(self.lab, "verify", "CMP-001").returncode, 0)
+        self.assertEqual(lab(self.lab, "audit", "CMP-001").returncode, 0)
 
         ledger = self.d / "ledger.tsv"
         original = ledger.read_text(encoding="utf-8")
         forged = original.replace("\tdiscard\t", "\tkeep\t", 1)
         self.assertNotEqual(forged, original)
         ledger.write_text(forged, encoding="utf-8")
-        r = lab(self.lab, "verify", "CMP-001", check=False)
+        r = lab(self.lab, "audit", "CMP-001", check=False)
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("규칙 재계산", r.stdout)
         ledger.write_text(original, encoding="utf-8")

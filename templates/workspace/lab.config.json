@@ -3,43 +3,36 @@
   "created": "{{DATE}}",
   "language": "ko",
   "budget_profile": "economy",
-  "cycle_sessions": 3,
   "profiles": {
     "economy": {
-      "meeting_rounds": 2,
+      "meeting_rounds": 1,
       "speakers_per_round": 3,
-      "review_passes": 1,
       "max_parallel_agents": 1,
       "literature_sources": 5,
       "brainstorm_agents": 3,
       "rank_judges": 1,
       "ideas_per_agent": 3,
-      "campaign_batch": 4,
-      "pilot_tournament": false
+      "campaign_batch": 4
     },
     "standard": {
-      "meeting_rounds": 3,
+      "meeting_rounds": 2,
       "speakers_per_round": 4,
-      "review_passes": 1,
       "max_parallel_agents": 2,
       "literature_sources": 8,
       "brainstorm_agents": 4,
       "rank_judges": 2,
       "ideas_per_agent": 4,
-      "campaign_batch": 5,
-      "pilot_tournament": true
+      "campaign_batch": 5
     },
     "deep": {
-      "meeting_rounds": 4,
+      "meeting_rounds": 3,
       "speakers_per_round": 6,
-      "review_passes": 2,
       "max_parallel_agents": 3,
       "literature_sources": 15,
       "brainstorm_agents": 6,
       "rank_judges": 3,
       "ideas_per_agent": 4,
-      "campaign_batch": 6,
-      "pilot_tournament": true
+      "campaign_batch": 6
     }
   },
   "campaign": {
@@ -61,7 +54,7 @@
   "report": {
     "after_activities": true,
     "open": true,
-    "_설명": "회의, 작업, 캠페인, 세션 정리가 끝날 때 결정·결과·실험을 모은 HTML 리포트를 reports/에 만들고(after_activities), 브라우저로 연다(open). 언제든 lab.py report [세션|EXP-id|CMP-id] --open 으로 직접 만들 수 있다."
+    "_설명": "세션 정리(archive)와 캠페인이 끝날 때 결정·결과·실험을 모은 HTML 리포트를 reports/에 만들고(after_activities), 브라우저로 연다(open). 언제든 lab.py report [세션|EXP-id|CMP-id] --open 으로 직접 만들 수 있다."
   },
   "git": {
     "auto_commit": true,
